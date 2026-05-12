@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "moodboard-capture": {
+      "command": "node",
+      "args": [
+        "./scripts/mcp-server.js"
+      ]
+    }
+  }
+}
