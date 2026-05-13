@@ -63,11 +63,17 @@ function parseArgs(argv) {
       index += 1;
       continue;
     }
+
+    if (token === '--userNote') {
+      parsed.userNote = argv[index + 1];
+      index += 1;
+      continue;
+    }
   }
 
   if (!parsed.url && !parsed.localImagePath) {
     throw new Error(
-      'Usage: node ./scripts/cli.js (--url <url> | --localImagePath <path>) [--destinationPath <path>] [--workspaceRoot <path>] [--tag <tag>] [--styleCue <cue>] [--whyLiked <note>]'
+      'Usage: node ./scripts/cli.js (--url <url> | --localImagePath <path>) [--destinationPath <path>] [--workspaceRoot <path>] [--tag <tag>] [--styleCue <cue>] [--whyLiked <note>] [--userNote <note>]'
     );
   }
 

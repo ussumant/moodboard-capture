@@ -6,6 +6,8 @@ import path from 'path';
 import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 import { chromium } from 'playwright';
+import { analyzeCaptureTaste } from './taste-analysis.js';
+import { updateTasteProfiles } from './taste-profile.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,7 +31,6 @@ const desktopViewport = {
 };
 
 /**
- * Normalized inspiration record persisted in the moodboard library index.
  * @typedef {Object} MoodboardRecord
  * @property {string} id
  * @property {string} createdAt
@@ -41,6 +42,14 @@ const desktopViewport = {
  * @property {string[]} tags
  * @property {string|null} whyLiked
  * @property {string[]} styleCues
+ * @property {string|null} userNote
+ * @property {'complete'|'failed'|'pending'} analysisStatus
+ * @property {Object|null} visualTraits
+ * @property {string|null} whyItWorks
+ * @property {string[]} designSignals
+ * @property {Object|null} profileContributions
+ * @property {Object|null} tasteAnalysis
+ * @property {string|null} analysisError
  */
 
 export async function saveInspirationToMoodboard({
@@ -51,6 +60,7 @@ export async function saveInspirationToMoodboard({
   tags,
   whyLiked,
   styleCues,
+  userNote,
 }) {
   const source = await resolveSourceInput({ url, localImagePath });
   const rootHint = resolveWorkspaceHint(workspaceRoot);
@@ -62,17 +72,10 @@ export async function saveInspirationToMoodboard({
   const libraryRoot = destination.resolvedPath;
   const assetsPath = path.join(libraryRoot, assetsDirectoryName);
   const timestamp = new Date();
-  const metadata = normalizeMetadata({ tags, whyLiked, styleCues });
+  const metadata = normalizeMetadata({ tags, whyLiked, styleCues, userNote });
   const assetFilename = buildAssetFileName(source, timestamp);
   const savedAssetPath = path.join(assetsPath, assetFilename);
   const indexPath = path.join(libraryRoot, libraryIndexFilename);
-  const record = buildLibraryRecord({
-    source,
-    destinationPath: libraryRoot,
-    assetFilename,
-    timestamp,
-    metadata,
-  });
 
   await fs.mkdir(assetsPath, { recursive: true });
 
@@ -80,6 +83,70 @@ export async function saveInspirationToMoodboard({
     await capturePage(source.normalizedUrl, savedAssetPath);
   } else {
     await copyLocalImage(source.absolutePath, savedAssetPath);
+  }
+
+  const record = buildBaseLibraryRecord({
+    source,
+    destinationPath: libraryRoot,
+    assetFilename,
+    timestamp,
+    metadata,
+  });
+
+  const globalProfileRoot = await resolveGlobalProfileRoot({
+    workspaceRoot: rootHint,
+    localLibraryRoot: libraryRoot,
+  });
+
+  let localProfilePath = path.join(libraryRoot, 'taste-profile.json');
+  let globalProfilePath = path.join(globalProfileRoot, 'workspace-taste-profile.json');
+  let profileUpdateStatus = {
+    local: 'skipped',
+    global: 'skipped',
+  };
+  let profileUpdateError = null;
+
+  try {
+    const tasteAnalysis = await analyzeCaptureTaste({
+      assetPath: savedAssetPath,
+      sourceType: source.type,
+      sourceUrl: source.type === 'url' ? source.normalizedUrl : null,
+      userNote: metadata.userNote,
+      tags: metadata.tags,
+      whyLiked: metadata.whyLiked,
+      styleCues: metadata.styleCues,
+    });
+
+    if (tasteAnalysis) {
+      applyTasteAnalysis(record, tasteAnalysis);
+
+      try {
+        const profileUpdate = await updateTasteProfiles({
+          localLibraryRoot: libraryRoot,
+          globalLibraryRoot: globalProfileRoot,
+          currentRecord: record,
+        });
+        localProfilePath = profileUpdate.localProfilePath;
+        globalProfilePath = profileUpdate.globalProfilePath;
+        profileUpdateStatus = profileUpdate.profileUpdateStatus;
+        profileUpdateError = profileUpdate.profileUpdateErrors?.global || profileUpdate.profileUpdateErrors?.local || null;
+        if (profileUpdateError) {
+          record.analysisError = `Profile update failed: ${profileUpdateError}`;
+        }
+      } catch (error) {
+        profileUpdateStatus = {
+          local: 'failed',
+          global: 'failed',
+        };
+        profileUpdateError = error.message;
+        record.analysisError = `Profile update failed: ${error.message}`;
+      }
+    } else {
+      record.analysisStatus = 'pending';
+    }
+  } catch (error) {
+    record.analysisStatus = 'failed';
+    record.analysisError = error.message;
   }
 
   await appendIndexEntry(indexPath, record);
@@ -90,6 +157,12 @@ export async function saveInspirationToMoodboard({
     indexPath,
     resolvedDestination: libraryRoot,
     warning: destination.warning,
+    analysisStatus: record.analysisStatus,
+    tasteAnalysis: record.tasteAnalysis,
+    localProfilePath,
+    globalProfilePath,
+    profileUpdateStatus,
+    profileUpdateError,
     record,
   };
 }
@@ -101,6 +174,7 @@ export async function saveWebsiteToMoodboard({
   tags,
   whyLiked,
   styleCues,
+  userNote,
 }) {
   const result = await saveInspirationToMoodboard({
     url,
@@ -109,6 +183,7 @@ export async function saveWebsiteToMoodboard({
     tags,
     whyLiked,
     styleCues,
+    userNote,
   });
 
   return {
@@ -187,11 +262,12 @@ async function normalizeLocalImagePath(input) {
   return absolutePath;
 }
 
-function normalizeMetadata({ tags, whyLiked, styleCues }) {
+function normalizeMetadata({ tags, whyLiked, styleCues, userNote }) {
   return {
     tags: normalizeStringArray(tags),
     whyLiked: normalizeOptionalText(whyLiked),
     styleCues: normalizeStringArray(styleCues),
+    userNote: normalizeOptionalText(userNote),
   };
 }
 
@@ -223,7 +299,7 @@ function normalizeOptionalText(input) {
   return trimmed || null;
 }
 
-function buildLibraryRecord({
+function buildBaseLibraryRecord({
   source,
   destinationPath,
   assetFilename,
@@ -242,9 +318,27 @@ function buildLibraryRecord({
     tags: metadata.tags,
     whyLiked: metadata.whyLiked,
     styleCues: metadata.styleCues,
+    userNote: metadata.userNote,
+    analysisStatus: 'pending',
+    visualTraits: null,
+    whyItWorks: null,
+    designSignals: [],
+    profileContributions: null,
+    tasteAnalysis: null,
+    analysisError: null,
   };
 
   return record;
+}
+
+function applyTasteAnalysis(record, tasteAnalysis) {
+  record.analysisStatus = 'complete';
+  record.visualTraits = tasteAnalysis.visualTraits;
+  record.whyItWorks = tasteAnalysis.whyItWorks;
+  record.designSignals = tasteAnalysis.designSignals;
+  record.profileContributions = tasteAnalysis.profileContributions;
+  record.tasteAnalysis = tasteAnalysis;
+  record.analysisError = null;
 }
 
 export function resolveWorkspaceHint(explicitWorkspaceRoot) {
@@ -302,6 +396,22 @@ async function resolveDestination({ destinationPath, workspaceRoot }) {
   };
 }
 
+async function resolveGlobalProfileRoot({ workspaceRoot, localLibraryRoot }) {
+  if (workspaceRoot) {
+    const conventional = await resolveConventionalMoodboard(workspaceRoot);
+    if (conventional) {
+      return conventional;
+    }
+
+    const discovered = await findMoodboardDirectory(workspaceRoot);
+    if (discovered) {
+      return discovered;
+    }
+  }
+
+  return localLibraryRoot;
+}
+
 async function resolveConventionalMoodboard(workspaceRoot) {
   const bases = await existingAncestorChain(workspaceRoot);
   for (const base of bases) {
@@ -343,7 +453,7 @@ async function findMoodboardDirectory(workspaceRoot) {
 
   while (queue.length > 0) {
     const current = queue.shift();
-    if (seen.has(current.dir)) {
+    if (!current || seen.has(current.dir)) {
       continue;
     }
     seen.add(current.dir);

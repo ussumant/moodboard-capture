@@ -1,7 +1,7 @@
 {
   "name": "moodboard-capture",
-  "version": "0.2.0",
-  "description": "Capture full-page website screenshots and import local images into a repo moodboard folder or a personal inbox.",
+  "version": "0.3.0",
+  "description": "Capture inspiration assets and build reusable taste-memory profiles in a repo moodboard folder or personal inbox.",
   "author": {
     "name": "Moodboard Capture Contributors",
     "email": "hello@example.com",
@@ -23,8 +23,8 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Moodboard Capture",
-    "shortDescription": "Save website screenshots or local images into a moodboard library with taste metadata.",
-    "longDescription": "Captures a desktop full-page screenshot for a URL or imports a local image, saves it into the best available moodboard folder, and appends a lightweight JSONL library record with tags and notes for later browsing or AI reuse.",
+    "shortDescription": "Save inspiration and build taste-memory profiles for future AI-assisted design work.",
+    "longDescription": "Captures a desktop full-page screenshot for a URL or imports a local image, saves it into the best available moodboard folder, and builds per-item taste interpretation plus local and workspace-level taste profiles when analysis is available.",
     "developerName": "Local plugin",
     "category": "Productivity",
     "capabilities": [
@@ -35,9 +35,9 @@
     "privacyPolicyURL": "https://openai.com/policies/row-privacy-policy/",
     "termsOfServiceURL": "https://openai.com/policies/row-terms-of-use/",
     "defaultPrompt": [
-      "Save https://example.com to my moodboard with tags for soft gradients and editorial layout.",
-      "Import /Users/me/Desktop/inspiration.png into the moodboard and note why I like it.",
-      "Capture this website into the moodboard folder."
+      "Save https://example.com to my moodboard and explain what makes the design work.",
+      "Import /Users/me/Desktop/inspiration.png and build taste-memory signals from it.",
+      "Capture this website into the moodboard folder with a note about what stands out."
     ],
     "brandColor": "#111827"
   }

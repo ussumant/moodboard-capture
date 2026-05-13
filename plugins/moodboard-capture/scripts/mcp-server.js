@@ -14,7 +14,7 @@ import {
 const server = new Server(
   {
     name: 'moodboard-capture',
-    version: '0.2.0',
+    version: '0.3.0',
   },
   {
     capabilities: {
@@ -44,7 +44,11 @@ const sharedProperties = {
     items: {
       type: 'string',
     },
-    description: 'Optional design direction cues such as muted palette or oversized serif.',
+      description: 'Optional design direction cues such as muted palette or oversized serif.',
+    },
+  userNote: {
+    type: 'string',
+    description: 'Optional short human note describing what stands out or why the reference matters.',
   },
 };
 
@@ -53,7 +57,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: 'save_inspiration_to_moodboard',
-        description: 'Save either a website screenshot or a local image into the moodboard library with optional taste metadata.',
+        description: 'Save either a website screenshot or a local image into the moodboard library, then build taste-memory signals when analysis is available.',
         inputSchema: {
           type: 'object',
           additionalProperties: false,
@@ -72,7 +76,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'save_website_to_moodboard',
-        description: 'Compatibility alias for saving a website screenshot into the moodboard library.',
+        description: 'Compatibility alias for saving a website screenshot into the moodboard library with taste-memory analysis.',
         inputSchema: {
           type: 'object',
           additionalProperties: false,
@@ -104,6 +108,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         tags: args.tags,
         whyLiked: args.whyLiked,
         styleCues: args.styleCues,
+        userNote: args.userNote,
       });
     } else if (name === 'save_website_to_moodboard') {
       result = await saveWebsiteToMoodboard({
@@ -112,6 +117,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         tags: args.tags,
         whyLiked: args.whyLiked,
         styleCues: args.styleCues,
+        userNote: args.userNote,
       });
     } else {
       throw new Error(`Unknown tool: ${name}`);
