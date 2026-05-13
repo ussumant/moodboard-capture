@@ -1,12 +1,14 @@
 # Moodboard Capture
 
-`Moodboard Capture` is a Codex plugin that saves website screenshots into a repo moodboard folder or a personal inbox.
+`Moodboard Capture` is a Codex plugin that saves website screenshots or local images into a repo moodboard folder or a personal inbox.
 
 ## Features
 
-- One-command desktop full-page capture
+- One-command desktop full-page website capture
+- Local image or desktop screenshot import
 - Repo-aware destination resolution
-- `captures.jsonl` index per destination folder
+- `library.jsonl` index per destination folder
+- Optional taste metadata with tags, notes, and style cues
 - Works with `https://`, `http://`, and `file://` URLs
 
 ## Repo layout
@@ -28,6 +30,12 @@ Then enable/install `Moodboard Capture` in Codex if it is not already enabled.
 cd plugins/moodboard-capture
 npm install
 node ./scripts/cli.js --url https://example.com
+```
+
+Example local-image import:
+
+```bash
+node ./scripts/cli.js --localImagePath /Users/me/Desktop/inspiration.png --tag editorial --whyLiked "Love the composition."
 ```
 
 ## Default save behavior

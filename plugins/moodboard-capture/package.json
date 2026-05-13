@@ -1,9 +1,9 @@
 {
   "name": "moodboard-capture",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Codex plugin for saving website screenshots into moodboard folders.",
+  "description": "Codex plugin for saving website screenshots and local images into moodboard folders.",
   "scripts": {
     "capture": "node ./scripts/cli.js",
     "test:smoke": "node ./scripts/cli.js --url https://example.com"

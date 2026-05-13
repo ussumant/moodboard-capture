@@ -3,6 +3,7 @@
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 import { chromium } from 'playwright';
 
@@ -10,6 +11,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const pluginRoot = path.resolve(__dirname, '..');
 const globalFallback = path.join(os.homedir(), 'Documents', 'Moodboards', 'Inbox');
+const libraryIndexFilename = 'library.jsonl';
+const assetsDirectoryName = 'assets';
+const supportedLocalImageExtensions = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.webp',
+  '.gif',
+  '.avif',
+]);
 
 const desktopViewport = {
   width: 1440,
@@ -17,39 +28,117 @@ const desktopViewport = {
   deviceScaleFactor: 2,
 };
 
-export async function saveWebsiteToMoodboard({
+/**
+ * Normalized inspiration record persisted in the moodboard library index.
+ * @typedef {Object} MoodboardRecord
+ * @property {string} id
+ * @property {string} createdAt
+ * @property {'url'|'local-image'} sourceType
+ * @property {string|null} sourceUrl
+ * @property {string|null} sourcePath
+ * @property {string} assetFilename
+ * @property {string} resolvedDestination
+ * @property {string[]} tags
+ * @property {string|null} whyLiked
+ * @property {string[]} styleCues
+ */
+
+export async function saveInspirationToMoodboard({
   url,
+  localImagePath,
   destinationPath,
   workspaceRoot,
+  tags,
+  whyLiked,
+  styleCues,
 }) {
-  const normalizedUrl = normalizeUrl(url);
+  const source = await resolveSourceInput({ url, localImagePath });
   const rootHint = resolveWorkspaceHint(workspaceRoot);
   const destination = await resolveDestination({
     destinationPath,
     workspaceRoot: rootHint,
   });
 
-  await fs.mkdir(destination.resolvedPath, { recursive: true });
-
+  const libraryRoot = destination.resolvedPath;
+  const assetsPath = path.join(libraryRoot, assetsDirectoryName);
   const timestamp = new Date();
-  const fileName = buildFileName(normalizedUrl, timestamp);
-  const imagePath = path.join(destination.resolvedPath, fileName);
-  const indexPath = path.join(destination.resolvedPath, 'captures.jsonl');
+  const metadata = normalizeMetadata({ tags, whyLiked, styleCues });
+  const assetFilename = buildAssetFileName(source, timestamp);
+  const savedAssetPath = path.join(assetsPath, assetFilename);
+  const indexPath = path.join(libraryRoot, libraryIndexFilename);
+  const record = buildLibraryRecord({
+    source,
+    destinationPath: libraryRoot,
+    assetFilename,
+    timestamp,
+    metadata,
+  });
 
-  await capturePage(normalizedUrl, imagePath);
-  await appendIndexEntry(indexPath, {
-    timestamp: timestamp.toISOString(),
-    url: normalizedUrl,
-    resolvedDestination: destination.resolvedPath,
-    imageFilename: fileName,
+  await fs.mkdir(assetsPath, { recursive: true });
+
+  if (source.type === 'url') {
+    await capturePage(source.normalizedUrl, savedAssetPath);
+  } else {
+    await copyLocalImage(source.absolutePath, savedAssetPath);
+  }
+
+  await appendIndexEntry(indexPath, record);
+
+  return {
+    recordId: record.id,
+    savedAssetPath,
+    indexPath,
+    resolvedDestination: libraryRoot,
+    warning: destination.warning,
+    record,
+  };
+}
+
+export async function saveWebsiteToMoodboard({
+  url,
+  destinationPath,
+  workspaceRoot,
+  tags,
+  whyLiked,
+  styleCues,
+}) {
+  const result = await saveInspirationToMoodboard({
+    url,
+    destinationPath,
+    workspaceRoot,
+    tags,
+    whyLiked,
+    styleCues,
   });
 
   return {
-    url: normalizedUrl,
-    savedImagePath: imagePath,
-    indexPath,
-    resolvedDestination: destination.resolvedPath,
-    warning: destination.warning,
+    ...result,
+    savedImagePath: result.savedAssetPath,
+    url: result.record.sourceUrl,
+  };
+}
+
+async function resolveSourceInput({ url, localImagePath }) {
+  const hasUrl = typeof url === 'string' && url.trim().length > 0;
+  const hasLocalImage = typeof localImagePath === 'string' && localImagePath.trim().length > 0;
+
+  if (hasUrl === hasLocalImage) {
+    throw new Error('Provide exactly one of "url" or "localImagePath".');
+  }
+
+  if (hasUrl) {
+    return {
+      type: 'url',
+      normalizedUrl: normalizeUrl(url),
+    };
+  }
+
+  const absolutePath = await normalizeLocalImagePath(localImagePath);
+  return {
+    type: 'local-image',
+    absolutePath,
+    extension: path.extname(absolutePath).toLowerCase(),
+    originalBasename: path.basename(absolutePath, path.extname(absolutePath)),
   };
 }
 
@@ -61,7 +150,7 @@ export function normalizeUrl(input) {
   let parsed;
   try {
     parsed = new URL(input);
-  } catch (error) {
+  } catch {
     throw new Error(`Invalid URL: ${input}`);
   }
 
@@ -70,6 +159,92 @@ export function normalizeUrl(input) {
   }
 
   return parsed.toString();
+}
+
+async function normalizeLocalImagePath(input) {
+  if (!input || typeof input !== 'string') {
+    throw new Error('A non-empty local image path string is required.');
+  }
+
+  const absolutePath = path.resolve(input);
+  const extension = path.extname(absolutePath).toLowerCase();
+
+  if (!supportedLocalImageExtensions.has(extension)) {
+    throw new Error(`Unsupported local image extension: ${extension || '(none)'}`);
+  }
+
+  let stat;
+  try {
+    stat = await fs.stat(absolutePath);
+  } catch {
+    throw new Error(`Local image file not found: ${absolutePath}`);
+  }
+
+  if (!stat.isFile()) {
+    throw new Error(`Local image path is not a file: ${absolutePath}`);
+  }
+
+  return absolutePath;
+}
+
+function normalizeMetadata({ tags, whyLiked, styleCues }) {
+  return {
+    tags: normalizeStringArray(tags),
+    whyLiked: normalizeOptionalText(whyLiked),
+    styleCues: normalizeStringArray(styleCues),
+  };
+}
+
+function normalizeStringArray(input) {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+
+  const normalized = [];
+  for (const value of input) {
+    if (typeof value !== 'string') {
+      continue;
+    }
+    const trimmed = value.trim();
+    if (!trimmed || normalized.includes(trimmed)) {
+      continue;
+    }
+    normalized.push(trimmed);
+  }
+  return normalized;
+}
+
+function normalizeOptionalText(input) {
+  if (typeof input !== 'string') {
+    return null;
+  }
+
+  const trimmed = input.trim();
+  return trimmed || null;
+}
+
+function buildLibraryRecord({
+  source,
+  destinationPath,
+  assetFilename,
+  timestamp,
+  metadata,
+}) {
+  /** @type {MoodboardRecord} */
+  const record = {
+    id: randomUUID(),
+    createdAt: timestamp.toISOString(),
+    sourceType: source.type,
+    sourceUrl: source.type === 'url' ? source.normalizedUrl : null,
+    sourcePath: source.type === 'local-image' ? source.absolutePath : null,
+    assetFilename,
+    resolvedDestination: destinationPath,
+    tags: metadata.tags,
+    whyLiked: metadata.whyLiked,
+    styleCues: metadata.styleCues,
+  };
+
+  return record;
 }
 
 export function resolveWorkspaceHint(explicitWorkspaceRoot) {
@@ -242,19 +417,36 @@ async function capturePage(url, outputPath) {
   }
 }
 
+async function copyLocalImage(sourcePath, outputPath) {
+  try {
+    await fs.copyFile(sourcePath, outputPath);
+  } catch (error) {
+    throw new Error(`Failed to save local image: ${error.message}`);
+  }
+}
+
 async function appendIndexEntry(indexPath, entry) {
   const payload = `${JSON.stringify(entry)}\n`;
   await fs.appendFile(indexPath, payload, 'utf8');
 }
 
-function buildFileName(rawUrl, timestamp) {
+function buildAssetFileName(source, timestamp) {
+  if (source.type === 'url') {
+    return buildWebsiteFileName(source.normalizedUrl, timestamp);
+  }
+
+  const baseName = sanitizeSegment(source.originalBasename) || 'inspiration';
+  return `${formatTimestamp(timestamp)}-${baseName}${source.extension}`;
+}
+
+function buildWebsiteFileName(rawUrl, timestamp) {
   const parsed = new URL(rawUrl);
   const host = sanitizeSegment(parsed.hostname || 'local');
-  const slug = buildSlug(parsed);
+  const slug = buildUrlSlug(parsed);
   return `${formatTimestamp(timestamp)}-${host}-${slug}.png`;
 }
 
-function buildSlug(parsedUrl) {
+function buildUrlSlug(parsedUrl) {
   const source = `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}` || '/';
   const cleaned = sanitizeSegment(source);
   if (cleaned && cleaned !== '-') {
@@ -264,7 +456,7 @@ function buildSlug(parsedUrl) {
 }
 
 function sanitizeSegment(value) {
-  return value
+  return String(value)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')

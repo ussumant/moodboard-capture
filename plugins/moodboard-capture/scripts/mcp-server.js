@@ -6,12 +6,15 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { saveWebsiteToMoodboard } from './capture-core.js';
+import {
+  saveInspirationToMoodboard,
+  saveWebsiteToMoodboard,
+} from './capture-core.js';
 
 const server = new Server(
   {
     name: 'moodboard-capture',
-    version: '0.1.0',
+    version: '0.2.0',
   },
   {
     capabilities: {
@@ -20,24 +23,65 @@ const server = new Server(
   }
 );
 
+const sharedProperties = {
+  destinationPath: {
+    type: 'string',
+    description: 'Optional absolute or workspace-relative folder path override.',
+  },
+  tags: {
+    type: 'array',
+    items: {
+      type: 'string',
+    },
+    description: 'Optional retrieval tags such as editorial, soft gradients, or dense grid.',
+  },
+  whyLiked: {
+    type: 'string',
+    description: 'Optional short note describing what you liked about this inspiration.',
+  },
+  styleCues: {
+    type: 'array',
+    items: {
+      type: 'string',
+    },
+    description: 'Optional design direction cues such as muted palette or oversized serif.',
+  },
+};
+
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
-        name: 'save_website_to_moodboard',
-        description: 'Capture a desktop full-page screenshot for a URL and save it into the best available moodboard folder.',
+        name: 'save_inspiration_to_moodboard',
+        description: 'Save either a website screenshot or a local image into the moodboard library with optional taste metadata.',
         inputSchema: {
           type: 'object',
           additionalProperties: false,
           properties: {
             url: {
               type: 'string',
-              description: 'The http, https, or file URL to capture.',
+              description: 'The http, https, or file URL to capture as a full-page screenshot.',
             },
-            destinationPath: {
+            localImagePath: {
               type: 'string',
-              description: 'Optional absolute or workspace-relative folder path override.',
+              description: 'Absolute or current-working-directory-relative path to a local image to import.',
             },
+            ...sharedProperties,
+          },
+        },
+      },
+      {
+        name: 'save_website_to_moodboard',
+        description: 'Compatibility alias for saving a website screenshot into the moodboard library.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            url: {
+              type: 'string',
+              description: 'The http, https, or file URL to capture as a full-page screenshot.',
+            },
+            ...sharedProperties,
           },
           required: ['url'],
         },
@@ -49,15 +93,29 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args = {} } = request.params;
 
-  if (name !== 'save_website_to_moodboard') {
-    throw new Error(`Unknown tool: ${name}`);
-  }
-
   try {
-    const result = await saveWebsiteToMoodboard({
-      url: args.url,
-      destinationPath: args.destinationPath,
-    });
+    let result;
+
+    if (name === 'save_inspiration_to_moodboard') {
+      result = await saveInspirationToMoodboard({
+        url: args.url,
+        localImagePath: args.localImagePath,
+        destinationPath: args.destinationPath,
+        tags: args.tags,
+        whyLiked: args.whyLiked,
+        styleCues: args.styleCues,
+      });
+    } else if (name === 'save_website_to_moodboard') {
+      result = await saveWebsiteToMoodboard({
+        url: args.url,
+        destinationPath: args.destinationPath,
+        tags: args.tags,
+        whyLiked: args.whyLiked,
+        styleCues: args.styleCues,
+      });
+    } else {
+      throw new Error(`Unknown tool: ${name}`);
+    }
 
     return {
       content: [

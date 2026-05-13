@@ -1,12 +1,14 @@
 # Moodboard Capture
 
-Save a website screenshot into a moodboard folder from Codex.
+Save website screenshots or local images into a moodboard library from Codex.
 
 ## What it does
 
-- Captures one desktop full-page PNG per URL
-- Resolves the destination folder automatically
-- Appends metadata to `captures.jsonl`
+- Captures one desktop full-page PNG per website URL
+- Imports an existing local image or desktop screenshot
+- Stores assets under `assets/` in the resolved moodboard destination
+- Appends structured inspiration records to `library.jsonl`
+- Accepts optional taste metadata inline: `tags`, `whyLiked`, and `styleCues`
 
 ## Destination order
 
@@ -15,14 +17,38 @@ Save a website screenshot into a moodboard folder from Codex.
 3. First workspace directory whose name contains `moodboard`
 4. `~/Documents/Moodboards/Inbox`
 
-## Tool
+## Tools
 
-- `save_website_to_moodboard`
+- `save_inspiration_to_moodboard`
+- `save_website_to_moodboard` compatibility alias
 
-Arguments:
+## `save_inspiration_to_moodboard` arguments
 
-- `url` (required)
+- `url` or `localImagePath` (exactly one required)
 - `destinationPath` (optional)
+- `tags` (optional string array)
+- `whyLiked` (optional string)
+- `styleCues` (optional string array)
+
+## CLI examples
+
+```bash
+cd plugins/moodboard-capture
+npm install
+
+node ./scripts/cli.js \
+  --url https://example.com \
+  --tag editorial \
+  --tag "soft gradients" \
+  --styleCue "muted palette" \
+  --whyLiked "I like the layered hero composition."
+
+node ./scripts/cli.js \
+  --localImagePath /Users/me/Desktop/inspiration.png \
+  --tag typography \
+  --styleCue "oversized serif" \
+  --whyLiked "The crop and type scale feel premium."
+```
 
 ## Install from this repo
 
