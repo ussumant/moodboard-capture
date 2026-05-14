@@ -7,7 +7,10 @@
 - `capture_taste`
 - `extract_design_system`
 - `summarize_taste`
+- `derive_design_directions`
+- `plan_landing_page`
 - `visualize_taste`
+- `landing-page-from-taste` skill for orchestrating landing-page planning from a moodboard library
 - Compatibility aliases remain available for the older save-oriented surface
 
 ## Features
@@ -23,6 +26,13 @@
 - Library-level design synthesis with:
   - `design-docs/library/design-system.json`
   - `design-docs/library/design.md`
+- Evidence-backed direction synthesis with:
+  - `design-docs/directions/<directionId>/design-system.json`
+  - `design-docs/directions/<directionId>/design.md`
+- Landing-page planning with:
+  - `landing-page-docs/landing-page-brief.json`
+  - `landing-page-docs/landing-page-brief.md`
+  - `landing-page-docs/provenance.json`
 - Taste-visual board generation from the accumulated profile and design synthesis
 - Optional `userNote` input, optional design `facets`, and legacy metadata support
 - Works with `https://`, `http://`, and `file://` URLs
@@ -122,6 +132,22 @@ node ./scripts/cli.js extract-design-system \
   --force
 ```
 
+Example direction synthesis:
+
+```bash
+node ./scripts/cli.js derive-design-directions \
+  --directionCount 3
+```
+
+Example landing-page planning:
+
+```bash
+node ./scripts/cli.js plan-landing-page \
+  --directionId infra-editorial \
+  --targetAudience "Builders evaluating whether this Codex plugin can generate trustworthy design direction" \
+  --productGoal "Create an install-forward open-source landing page with real proof."
+```
+
 ## Analysis behavior
 
 - Asset save happens first
@@ -149,12 +175,14 @@ node ./scripts/cli.js extract-design-system \
 
 - The plugin summarizes taste into `taste-summary.json`
 - It also writes library-level design synthesis into `design-docs/library/`
-- `visualize_taste` uses the taste summary and prefers the library design synthesis when present
+- `derive_design_directions` turns the current library into 2-3 richer direction artifacts grounded in extracted references
+- `plan_landing_page` turns one chosen direction into a section-by-section brief plus provenance
+- `visualize_taste` uses the taste summary and prefers direction-level design artifacts when present
 - By default it renders three branches:
   - `infra-editorial`
   - `warm-technical`
   - `strange-systems`
-- Generated images are saved in `~/Documents/Moodboards/Inbox/taste-boards` unless another `destinationPath` is used
+- Generated images are saved in `~/Documents/Moodboards/Inbox/taste-boards/landing-page` when direction artifacts exist, otherwise `taste-boards`
 
 ## Default save behavior
 

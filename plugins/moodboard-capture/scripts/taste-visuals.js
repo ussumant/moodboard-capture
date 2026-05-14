@@ -4,6 +4,7 @@ import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
 import { getLibraryDesignPaths } from './design-system.js';
+import { getDirectionDesignPaths } from './landing-page-workflow.js';
 import { summarizeTaste } from './taste-summary.js';
 
 const defaultImageModel = 'gpt-image-1';
@@ -24,13 +25,16 @@ export async function visualizeTaste({
   const resolvedSummaryPath = summaryPath
     ? path.resolve(summaryPath)
     : path.join(libraryRoot, 'taste-summary.json');
-  const visualsRoot = path.join(libraryRoot, 'taste-boards');
   const selectedDirections = normalizeDirections(directions);
   const visualMode = resolveVisualMode();
   const tasteContext = await ensureTasteContext({
     libraryRoot,
     summaryPath: resolvedSummaryPath,
+    directions: selectedDirections,
   });
+  const visualsRoot = tasteContext.hasDirectionArtifacts
+    ? path.join(libraryRoot, 'taste-boards', 'landing-page')
+    : path.join(libraryRoot, 'taste-boards');
 
   await fs.mkdir(visualsRoot, { recursive: true });
 
@@ -40,6 +44,7 @@ export async function visualizeTaste({
       direction,
       summary: tasteContext.summary,
       libraryDesignSystem: tasteContext.libraryDesignSystem,
+      directionArtifact: tasteContext.directionArtifacts[direction]?.designSystem || null,
     }),
   }));
 
@@ -55,6 +60,7 @@ export async function visualizeTaste({
           mode: 'mock',
           summaryPath: tasteContext.summaryPath,
           libraryDesignSystemPath: tasteContext.libraryDesignSystemPath,
+          directionDesignSystemPath: tasteContext.directionArtifacts[item.direction]?.designSystemJsonPath || null,
         }, null, 2)}\n`,
         'utf8'
       );
@@ -70,6 +76,7 @@ export async function visualizeTaste({
       libraryRoot,
       summaryPath: tasteContext.summaryPath,
       libraryDesignSystemPath: tasteContext.libraryDesignSystemPath,
+      directionArtifactPaths: mapDirectionArtifactPaths(tasteContext.directionArtifacts),
       directions: selectedDirections,
       visualsRoot,
       mode: 'mock',
@@ -94,6 +101,7 @@ export async function visualizeTaste({
       direction: item.direction,
       savedPath,
       prompt: item.prompt,
+      directionDesignSystemPath: tasteContext.directionArtifacts[item.direction]?.designSystemJsonPath || null,
       mode: 'generated',
     });
   }
@@ -102,6 +110,7 @@ export async function visualizeTaste({
     libraryRoot,
     summaryPath: tasteContext.summaryPath,
     libraryDesignSystemPath: tasteContext.libraryDesignSystemPath,
+    directionArtifactPaths: mapDirectionArtifactPaths(tasteContext.directionArtifacts),
     directions: selectedDirections,
     visualsRoot,
     mode: 'generated',
@@ -140,10 +149,14 @@ export async function generateTasteVisuals(args) {
   });
 }
 
-async function ensureTasteContext({ libraryRoot, summaryPath }) {
+async function ensureTasteContext({ libraryRoot, summaryPath, directions }) {
   const designPaths = getLibraryDesignPaths({ libraryRoot });
   const hasSummary = await fileExists(summaryPath);
   const hasLibraryDesign = await fileExists(designPaths.designSystemJsonPath);
+  const resolvedDirectionArtifacts = await loadDirectionArtifacts({
+    libraryRoot,
+    directions,
+  });
 
   if (hasSummary && hasLibraryDesign) {
     return {
@@ -151,6 +164,8 @@ async function ensureTasteContext({ libraryRoot, summaryPath }) {
       summary: await readJson(summaryPath),
       libraryDesignSystemPath: designPaths.designSystemJsonPath,
       libraryDesignSystem: await readJson(designPaths.designSystemJsonPath),
+      directionArtifacts: resolvedDirectionArtifacts,
+      hasDirectionArtifacts: Object.keys(resolvedDirectionArtifacts).length > 0,
     };
   }
 
@@ -163,7 +178,28 @@ async function ensureTasteContext({ libraryRoot, summaryPath }) {
     summary: summaryResult.summary,
     libraryDesignSystemPath: summaryResult.libraryDesignSystemPath,
     libraryDesignSystem: summaryResult.libraryDesignSystem,
+    directionArtifacts: resolvedDirectionArtifacts,
+    hasDirectionArtifacts: Object.keys(resolvedDirectionArtifacts).length > 0,
   };
+}
+
+async function loadDirectionArtifacts({ libraryRoot, directions }) {
+  const artifacts = {};
+
+  for (const direction of directions || []) {
+    const paths = getDirectionDesignPaths({ libraryRoot, directionId: direction });
+    if (!await fileExists(paths.designSystemJsonPath)) {
+      continue;
+    }
+
+    artifacts[direction] = {
+      designSystemJsonPath: paths.designSystemJsonPath,
+      designMdPath: paths.designMdPath,
+      designSystem: await readJson(paths.designSystemJsonPath),
+    };
+  }
+
+  return artifacts;
 }
 
 async function fileExists(filePath) {
@@ -245,7 +281,7 @@ async function generateImage({ apiKey, prompt }) {
   return base64Image;
 }
 
-function buildTasteVisualPrompt({ direction, summary, libraryDesignSystem }) {
+function buildTasteVisualPrompt({ direction, summary, libraryDesignSystem, directionArtifact }) {
   const branch = summary.branchDirections?.find((item) => item.id === direction);
   if (!branch) {
     throw new Error(`Taste summary does not contain branch direction: ${direction}`);
@@ -288,7 +324,28 @@ function buildTasteVisualPrompt({ direction, summary, libraryDesignSystem }) {
     `Avoid notes: ${joinList(branch.avoidNotes)}.`,
   ];
 
+  if (directionArtifact) {
+    branchLines.push(
+      `Direction overview: ${directionArtifact.overview}`,
+      `Direction palette system: ${joinList(directionArtifact.paletteSystem?.recurringTokens)}.`,
+      `Direction typography system: ${joinList(directionArtifact.typographySystem?.familyDirection)}.`,
+      `Direction composition rules: ${joinList(directionArtifact.compositionRules)}.`,
+      `Direction component posture: ${joinList(directionArtifact.componentPosture)}.`,
+      `Direction illustration posture: ${joinList(directionArtifact.illustrationPosture)}.`,
+      `Direction CTA tone: ${joinList(directionArtifact.ctaTone?.principles)}.`,
+      `Direction confidence notes: ${joinList(directionArtifact.confidenceNotes)}.`
+    );
+  }
+
   return [...sharedLines, '', ...branchLines].join('\n');
+}
+
+function mapDirectionArtifactPaths(directionArtifacts) {
+  const entries = Object.entries(directionArtifacts || {});
+  return Object.fromEntries(entries.map(([direction, artifact]) => [
+    direction,
+    artifact.designSystemJsonPath,
+  ]));
 }
 
 function joinList(values, fallback = 'none recorded yet') {

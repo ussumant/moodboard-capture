@@ -4,6 +4,10 @@ import {
   extractDesignSystem,
   saveInspirationToMoodboard,
 } from './capture-core.js';
+import {
+  deriveDesignDirections,
+  planLandingPage,
+} from './landing-page-workflow.js';
 import { summarizeTaste } from './taste-summary.js';
 import { visualizeTaste } from './taste-visuals.js';
 
@@ -34,6 +38,16 @@ async function runCommand(command, argv) {
     return visualizeTaste(parsed);
   }
 
+  if (command === 'derive-design-directions') {
+    const parsed = parseDirectionArgs(argv);
+    return deriveDesignDirections(parsed);
+  }
+
+  if (command === 'plan-landing-page') {
+    const parsed = parseLandingPageArgs(argv);
+    return planLandingPage(parsed);
+  }
+
   const parsed = parseCaptureArgs(argv);
   return saveInspirationToMoodboard(parsed);
 }
@@ -48,7 +62,7 @@ function splitCommand(argv) {
   }
 
   const normalized = first.trim().toLowerCase();
-  if (['capture', 'extract-design-system', 'summarize-taste', 'visualize-taste'].includes(normalized)) {
+  if (['capture', 'extract-design-system', 'summarize-taste', 'visualize-taste', 'derive-design-directions', 'plan-landing-page'].includes(normalized)) {
     return {
       command: normalized,
       argv: rest,
@@ -227,6 +241,82 @@ function parseVisualizeArgs(argv) {
       parsed.directions.push(argv[index + 1]);
       index += 1;
     }
+  }
+
+  return parsed;
+}
+
+function parseDirectionArgs(argv) {
+  const parsed = {
+    referenceIds: [],
+  };
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+
+    if (token === '--destinationPath') {
+      parsed.destinationPath = argv[index + 1];
+      index += 1;
+      continue;
+    }
+
+    if (token === '--referenceId') {
+      parsed.referenceIds.push(argv[index + 1]);
+      index += 1;
+      continue;
+    }
+
+    if (token === '--directionCount') {
+      parsed.directionCount = Number(argv[index + 1]);
+      index += 1;
+    }
+  }
+
+  return parsed;
+}
+
+function parseLandingPageArgs(argv) {
+  const parsed = {
+    referenceIds: [],
+  };
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+
+    if (token === '--destinationPath') {
+      parsed.destinationPath = argv[index + 1];
+      index += 1;
+      continue;
+    }
+
+    if (token === '--directionId') {
+      parsed.directionId = argv[index + 1];
+      index += 1;
+      continue;
+    }
+
+    if (token === '--referenceId') {
+      parsed.referenceIds.push(argv[index + 1]);
+      index += 1;
+      continue;
+    }
+
+    if (token === '--targetAudience') {
+      parsed.targetAudience = argv[index + 1];
+      index += 1;
+      continue;
+    }
+
+    if (token === '--productGoal') {
+      parsed.productGoal = argv[index + 1];
+      index += 1;
+    }
+  }
+
+  if (!parsed.directionId) {
+    throw new Error(
+      'Usage: node ./scripts/cli.js plan-landing-page --directionId <infra-editorial|warm-technical|strange-systems> [--destinationPath <path>] [--referenceId <id>] [--targetAudience <text>] [--productGoal <text>]'
+    );
   }
 
   return parsed;

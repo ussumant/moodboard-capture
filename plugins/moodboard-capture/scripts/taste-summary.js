@@ -4,6 +4,7 @@ import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
 import {
+  loadCompleteDesignReferences,
   synthesizeLibraryDesignSystem,
   writeLibraryDesignArtifacts,
 } from './design-system.js';
@@ -50,6 +51,10 @@ export async function summarizeTaste({
   const summaryPath = path.join(libraryRoot, defaultSummaryFilename);
   const libraryPath = path.join(libraryRoot, 'library.jsonl');
   const records = await readLibraryRecords(libraryPath);
+  const designReferences = await loadCompleteDesignReferences({
+    records,
+    libraryRoot,
+  });
   const tasteProfile = await loadTasteProfile({
     profilePath: resolvedProfilePath,
     records,
@@ -57,6 +62,7 @@ export async function summarizeTaste({
   const summary = buildTasteSummary({
     profile: tasteProfile,
     records,
+    designReferences,
   });
 
   await fs.mkdir(libraryRoot, { recursive: true });
@@ -65,6 +71,7 @@ export async function summarizeTaste({
   const libraryDesignSystem = await synthesizeLibraryDesignSystem({
     records,
     tasteSummary: summary,
+    libraryRoot,
   });
   const libraryDesignArtifacts = await writeLibraryDesignArtifacts({
     libraryRoot,
@@ -76,21 +83,24 @@ export async function summarizeTaste({
     profilePath: resolvedProfilePath,
     summaryPath,
     summary,
+    records,
+    designReferences,
     libraryDesignSystemPath: libraryDesignArtifacts.designSystemJsonPath,
     libraryDesignMdPath: libraryDesignArtifacts.designMdPath,
     libraryDesignSystem,
   };
 }
 
-export function buildTasteSummary({ profile, records }) {
+export function buildTasteSummary({ profile, records, designReferences = [] }) {
   const complete = records.filter((record) => record?.analysisStatus === 'complete' && record?.tasteAnalysis);
-  const signalGroups = collectSignals(complete);
+  const signalGroups = collectSignals(complete, designReferences);
 
   const stablePreferences = uniqueStrings([
     ...profile.recurringPreferences.slice(0, 4),
     ...profile.typePreferences.slice(0, 3),
     ...profile.palettePreferences.slice(0, 3),
     ...profile.compositionTendencies.slice(0, 3),
+    ...signalGroups.designCharacteristics.slice(0, 4),
   ]).slice(0, 10);
 
   const antiPatterns = uniqueStrings(profile.avoidedPatterns).slice(0, 8);
@@ -118,6 +128,7 @@ export function buildTasteSummary({ profile, records }) {
       compositionTendencies: profile.compositionTendencies,
       materialTexturePreferences: profile.materialTexturePreferences,
       recurringPreferences: profile.recurringPreferences,
+      referenceDesignCount: designReferences.length,
     },
   };
 }
@@ -136,7 +147,7 @@ async function loadTasteProfile({ profilePath, records }) {
   }
 }
 
-function collectSignals(records) {
+function collectSignals(records, designReferences) {
   const tones = [];
   const imagery = [];
   const palettes = [];
@@ -144,6 +155,7 @@ function collectSignals(records) {
   const composition = [];
   const materials = [];
   const avoids = [];
+  const designCharacteristics = [];
 
   for (const record of records) {
     const analysis = record.tasteAnalysis;
@@ -160,6 +172,16 @@ function collectSignals(records) {
     avoids.push(...normalizeArray(analysis.profileContributions?.avoidedPatterns));
   }
 
+  for (const item of designReferences) {
+    designCharacteristics.push(...normalizeArray(item.extraction?.keyCharacteristics));
+    palettes.push(...normalizeArray(item.extraction?.colors?.gradientNotes));
+    typography.push(...normalizeArray(item.extraction?.typography?.principles));
+    composition.push(...normalizeArray(item.extraction?.layout?.gridNotes));
+    imagery.push(...normalizeArray(item.extraction?.imageryIllustration?.styles));
+    materials.push(...normalizeArray(item.extraction?.imageryIllustration?.behaviors));
+    avoids.push(...normalizeArray(item.extraction?.donts));
+  }
+
   return {
     tones: uniqueStrings(tones),
     imagery: uniqueStrings(imagery),
@@ -168,6 +190,7 @@ function collectSignals(records) {
     composition: uniqueStrings(composition),
     materials: uniqueStrings(materials),
     avoids: uniqueStrings(avoids),
+    designCharacteristics: uniqueStrings(designCharacteristics),
   };
 }
 

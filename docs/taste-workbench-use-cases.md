@@ -239,6 +239,44 @@ These should be thought of as higher-level structured inputs on top of the curre
 - better image prompts
 - less generic visual output
 
+## Landing Page From Taste
+
+This workflow is now strong enough to become a first-class product path:
+
+1. capture references
+2. extract per-reference design systems
+3. summarize the active taste library
+4. derive 2-3 evidence-backed directions
+5. optionally visualize those directions
+6. write a landing-page brief and provenance artifact
+
+### Why it worked in practice
+
+- The references prevented the visual direction from drifting into generic SaaS styling.
+- `design-system.json` gave the pipeline a machine-readable source of truth for typography, color, layout, components, and illustration patterns.
+- `design.md` remained useful because it compressed those signals into language a designer or frontend engineer could actually reason about.
+- Branching into `infra-editorial`, `warm-technical`, and `strange-systems` let visual exploration happen without collapsing everything into one averaged direction.
+- Image generation was useful only after the direction was chosen and bounded by extracted signals.
+- A landing-page brief became the handoff artifact that kept implementation grounded.
+
+### New workflow artifacts
+
+- `design-docs/directions/<directionId>/design-system.json`
+- `design-docs/directions/<directionId>/design.md`
+- `landing-page-docs/landing-page-brief.json`
+- `landing-page-docs/landing-page-brief.md`
+- `landing-page-docs/provenance.json`
+
+### Expected result
+
+The output should be specific enough that a separate frontend engineer or agent can implement the page without inventing:
+- the page thesis
+- the hero visual system
+- the typography pairing
+- the palette strategy
+- the proof blocks
+- the CTA structure
+
 ### 5. Comparative Positioning Form
 
 **Purpose**

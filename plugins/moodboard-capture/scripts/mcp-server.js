@@ -17,11 +17,15 @@ import {
   generateTasteVisuals,
   visualizeTaste,
 } from './taste-visuals.js';
+import {
+  deriveDesignDirections,
+  planLandingPage,
+} from './landing-page-workflow.js';
 
 const server = new Server(
   {
     name: 'moodboard-capture',
-    version: '0.4.0',
+    version: '0.5.0',
   },
   {
     capabilities: {
@@ -67,6 +71,14 @@ const captureProperties = {
     description: 'Optional short human note describing what stands out or why the reference matters.',
   },
   facets: facetSchema,
+};
+
+const referenceIdsSchema = {
+  type: 'array',
+  items: {
+    type: 'string',
+  },
+  description: 'Optional saved record ids to narrow synthesis to a specific subset of references.',
 };
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -135,7 +147,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'visualize_taste',
-        description: 'Generate visual moodboards from the active taste summary and library design-system synthesis in one or more named directions.',
+        description: 'Generate visual moodboards from the active taste summary and, when available, direction-level design artifacts in one or more named directions.',
         inputSchema: {
           type: 'object',
           additionalProperties: false,
@@ -157,6 +169,55 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description: 'Optional list of visual directions to render. Defaults to all three.',
             },
           },
+        },
+      },
+      {
+        name: 'derive_design_directions',
+        description: 'Turn the active moodboard library into 2-3 structured landing-page-ready design directions backed by extracted reference evidence.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            destinationPath: {
+              type: 'string',
+              description: 'Optional absolute or workspace-relative library root override.',
+            },
+            referenceIds: referenceIdsSchema,
+            directionCount: {
+              type: 'integer',
+              enum: [2, 3],
+              description: 'Optional number of directions to generate. Defaults to all three starter directions.',
+            },
+          },
+        },
+      },
+      {
+        name: 'plan_landing_page',
+        description: 'Turn a chosen design direction into a build-ready landing-page brief plus provenance artifacts.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            destinationPath: {
+              type: 'string',
+              description: 'Optional absolute or workspace-relative library root override.',
+            },
+            directionId: {
+              type: 'string',
+              enum: ['infra-editorial', 'warm-technical', 'strange-systems'],
+              description: 'The direction id to turn into a landing-page brief.',
+            },
+            referenceIds: referenceIdsSchema,
+            targetAudience: {
+              type: 'string',
+              description: 'Optional audience framing for the landing-page brief.',
+            },
+            productGoal: {
+              type: 'string',
+              description: 'Optional product or page goal to emphasize in the landing-page brief.',
+            },
+          },
+          required: ['directionId'],
         },
       },
       {
@@ -262,6 +323,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         destinationPath: args.destinationPath,
         summaryPath: args.summaryPath,
         directions: args.directions,
+      });
+    } else if (name === 'derive_design_directions') {
+      result = await deriveDesignDirections({
+        destinationPath: args.destinationPath,
+        referenceIds: args.referenceIds,
+        directionCount: args.directionCount,
+      });
+    } else if (name === 'plan_landing_page') {
+      result = await planLandingPage({
+        destinationPath: args.destinationPath,
+        directionId: args.directionId,
+        referenceIds: args.referenceIds,
+        targetAudience: args.targetAudience,
+        productGoal: args.productGoal,
       });
     } else if (name === 'save_inspiration_to_moodboard') {
       result = await saveInspirationToMoodboard({

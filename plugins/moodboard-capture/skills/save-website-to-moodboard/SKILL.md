@@ -8,7 +8,9 @@ description: Save inspiration into a moodboard library, extract taste memory, an
 Use `capture_taste` when the user wants to save inspiration and capture what makes it good.
 Use `extract_design_system` when the user wants a deeper design-system breakdown, a `design.md`, or a focused facet like typography or components.
 Use `summarize_taste` when the user wants a structured brief of what the current taste profile means.
-Use `visualize_taste` when the user wants moodboard images that express the accumulated taste profile.
+Use `derive_design_directions` when the user wants 2-3 richer, evidence-backed direction variants from the current moodboard.
+Use `plan_landing_page` when the user wants a build-ready landing-page brief from one chosen direction.
+Use `visualize_taste` when the user wants moodboard images or landing-page concept boards that express the accumulated taste profile.
 
 ## When to use it
 
@@ -21,6 +23,8 @@ Use `visualize_taste` when the user wants moodboard images that express the accu
 - "Extract the typography and component system from that capture"
 - "Summarize my taste so far"
 - "Show me visuals of my taste"
+- "Turn my moodboard into 2-3 landing-page directions"
+- "Plan a landing page from the warm-technical direction"
 
 ## Primary commands
 
@@ -34,6 +38,11 @@ Use `visualize_taste` when the user wants moodboard images that express the accu
   - Optional: `destinationPath`, `facets`, `force`
 - `summarize_taste`
   - Optional: `destinationPath`, `profilePath`
+- `derive_design_directions`
+  - Optional: `destinationPath`, `referenceIds`, `directionCount`
+- `plan_landing_page`
+  - Required: `directionId`
+  - Optional: `destinationPath`, `referenceIds`, `targetAudience`, `productGoal`
 - `visualize_taste`
   - Optional: `destinationPath`, `summaryPath`, `directions`
 - Compatibility aliases still work:
@@ -54,7 +63,9 @@ Use `visualize_taste` when the user wants moodboard images that express the accu
 - Writes per-reference design artifacts under `design-docs/references/<recordId>/`
 - `summarize_taste` writes `taste-summary.json`
 - `summarize_taste` also writes library-level design docs under `design-docs/library/`
-- `visualize_taste` renders summary-based taste boards into `taste-boards/`
+- `derive_design_directions` writes direction artifacts under `design-docs/directions/<directionId>/`
+- `plan_landing_page` writes landing-page docs under `landing-page-docs/`
+- `visualize_taste` renders summary-based taste boards into `taste-boards/`, and uses `taste-boards/landing-page/` when direction artifacts exist
 
 ## Response expectations
 
@@ -67,4 +78,6 @@ Tell the user:
 - which profile artifacts were updated
 - whether a fallback destination was used
 - when summarizing taste, where the summary and library design artifacts were saved
+- when deriving directions, which directions were generated and which references grounded them
+- when planning a landing page, where the brief and provenance files were written
 - when visualizing taste, which directions were rendered and where the boards were saved

@@ -1,13 +1,15 @@
 {
   "name": "moodboard-capture",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
-  "description": "Codex plugin for saving inspiration assets, building taste-memory profiles, and generating design-system docs.",
+  "description": "Codex plugin for saving inspiration assets, building taste-memory profiles, deriving design directions, and planning landing pages from real references.",
   "scripts": {
     "capture": "node ./scripts/cli.js",
     "extract-design-system": "node ./scripts/cli.js extract-design-system",
     "summarize-taste": "node ./scripts/cli.js summarize-taste",
+    "derive-design-directions": "node ./scripts/cli.js derive-design-directions",
+    "plan-landing-page": "node ./scripts/cli.js plan-landing-page",
     "visualize-taste": "node ./scripts/cli.js visualize-taste",
     "test:smoke": "node ./scripts/cli.js capture --url https://example.com"
   },

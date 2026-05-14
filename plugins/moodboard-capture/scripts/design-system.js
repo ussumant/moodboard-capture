@@ -49,6 +49,28 @@ export function getReferenceDesignPaths({ libraryRoot, recordId }) {
   };
 }
 
+export function resolveReferenceDesignPaths({ libraryRoot, record }) {
+  const root = libraryRoot || record?.resolvedDestination;
+  if (!root || !record?.id) {
+    return {
+      designRoot: record?.designSystemJsonPath ? path.dirname(record.designSystemJsonPath) : null,
+      designSystemJsonPath: record?.designSystemJsonPath || null,
+      designMdPath: record?.designMdPath || null,
+    };
+  }
+
+  const fallback = getReferenceDesignPaths({
+    libraryRoot: root,
+    recordId: record.id,
+  });
+
+  return {
+    designRoot: fallback.designRoot,
+    designSystemJsonPath: record?.designSystemJsonPath || fallback.designSystemJsonPath,
+    designMdPath: record?.designMdPath || fallback.designMdPath,
+  };
+}
+
 export function getLibraryDesignPaths({ libraryRoot }) {
   const designRoot = path.join(libraryRoot, 'design-docs', 'library');
   return {
@@ -344,22 +366,60 @@ export async function readReferenceDesignExtraction(record) {
   }
 }
 
+export async function loadCompleteDesignReferences({ records, libraryRoot }) {
+  const references = [];
+
+  for (const record of Array.isArray(records) ? records : []) {
+    if (!record?.id) {
+      continue;
+    }
+
+    const paths = resolveReferenceDesignPaths({
+      libraryRoot,
+      record,
+    });
+
+    if (!paths.designSystemJsonPath) {
+      continue;
+    }
+
+    const shouldAttempt =
+      record.designExtractionStatus === 'complete' ||
+      await fileExists(paths.designSystemJsonPath);
+
+    if (!shouldAttempt) {
+      continue;
+    }
+
+    const hydratedRecord = {
+      ...record,
+      designSystemJsonPath: paths.designSystemJsonPath,
+      designMdPath: record.designMdPath || paths.designMdPath,
+    };
+    const extraction = await readReferenceDesignExtraction(hydratedRecord);
+
+    if (!extraction) {
+      continue;
+    }
+
+    references.push({
+      record: hydratedRecord,
+      extraction,
+    });
+  }
+
+  return references;
+}
+
 export async function synthesizeLibraryDesignSystem({
   records,
   tasteSummary,
+  libraryRoot,
 }) {
-  const completeDesignRecords = records.filter((record) => record?.designExtractionStatus === 'complete');
-  const extractions = [];
-
-  for (const record of completeDesignRecords) {
-    const extraction = await readReferenceDesignExtraction(record);
-    if (extraction) {
-      extractions.push({
-        record,
-        extraction,
-      });
-    }
-  }
+  const extractions = await loadCompleteDesignReferences({
+    records,
+    libraryRoot,
+  });
 
   const stablePatterns = topStrings(collectStablePatterns(extractions, tasteSummary));
   const antiPatterns = uniqueStrings([
@@ -370,11 +430,12 @@ export async function synthesizeLibraryDesignSystem({
     ...normalizeStringArray(tasteSummary?.tensions),
     ...inferDesignTensions(extractions),
   ]).slice(0, 6);
-  const sourceRecordIds = completeDesignRecords.map((record) => record.id);
+  const sourceRecordIds = extractions.map(({ record }) => record.id);
 
   return {
     generatedAt: new Date().toISOString(),
     sourceRecordIds,
+    sourceCount: extractions.length,
     overview: buildLibraryOverview({
       sourceCount: extractions.length,
       stablePatterns,
@@ -1188,6 +1249,15 @@ function slugify(value) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .replace(/-{2,}/g, '-');
+}
+
+async function fileExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function escapePipe(value) {

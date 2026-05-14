@@ -7,7 +7,10 @@ Save inspiration assets into a moodboard library from Codex, build reusable tast
 - `capture_taste`: save inspiration, update the active taste profile, and auto-attempt per-reference design extraction
 - `extract_design_system`: regenerate or refine `design-system.json` and `design.md` for an existing saved reference
 - `summarize_taste`: synthesize the active library into a structured taste brief plus library-level design system docs
-- `visualize_taste`: generate visual boards from the summary artifact and library design synthesis
+- `derive_design_directions`: turn the active library into 2-3 evidence-backed direction variants for downstream design work
+- `plan_landing_page`: turn a chosen direction into a build-ready landing-page brief plus provenance artifacts
+- `visualize_taste`: generate visual boards from the summary artifact and, when present, direction-level design artifacts
+- `landing-page-from-taste` skill: orchestrate summary -> directions -> optional visuals -> landing-page brief -> review checkpoint
 - Compatibility aliases remain available:
   - `save_inspiration_to_moodboard`
   - `save_website_to_moodboard`
@@ -39,6 +42,8 @@ Save inspiration assets into a moodboard library from Codex, build reusable tast
 - `extract_design_system`
 - `summarize_taste`
 - `visualize_taste`
+- `derive_design_directions`
+- `plan_landing_page`
 - `save_inspiration_to_moodboard` compatibility alias
 - `save_website_to_moodboard` compatibility alias
 - `generate_taste_visuals` compatibility alias
@@ -60,6 +65,20 @@ Save inspiration assets into a moodboard library from Codex, build reusable tast
 - `facets` (optional string array)
 - `force` (optional boolean)
 
+## `derive_design_directions` arguments
+
+- `destinationPath` (optional)
+- `referenceIds` (optional string array)
+- `directionCount` (optional integer, `2` or `3`)
+
+## `plan_landing_page` arguments
+
+- `directionId` (required)
+- `destinationPath` (optional)
+- `referenceIds` (optional string array)
+- `targetAudience` (optional string)
+- `productGoal` (optional string)
+
 ## CLI examples
 
 ```bash
@@ -79,6 +98,14 @@ node ./scripts/cli.js extract-design-system \
   --facet typography \
   --facet components \
   --force
+
+node ./scripts/cli.js derive-design-directions \
+  --directionCount 3
+
+node ./scripts/cli.js plan-landing-page \
+  --directionId warm-technical \
+  --targetAudience "Founders and designers evaluating an open-source Codex plugin" \
+  --productGoal "Explain the workflow clearly and prove it can generate implementation-ready landing page direction."
 ```
 
 ## Installation
@@ -145,12 +172,19 @@ If Codex still shows the old version, reload Codex or disable/re-enable the plug
 - `summarize_taste` also creates:
   - `design-docs/library/design-system.json`
   - `design-docs/library/design.md`
-- `visualize_taste` reads `taste-summary.json` and prefers the library design synthesis when present
+- `derive_design_directions` writes:
+  - `design-docs/directions/<directionId>/design-system.json`
+  - `design-docs/directions/<directionId>/design.md`
+- `plan_landing_page` writes:
+  - `landing-page-docs/landing-page-brief.json`
+  - `landing-page-docs/landing-page-brief.md`
+  - `landing-page-docs/provenance.json`
+- `visualize_taste` reads `taste-summary.json` and prefers direction-level design artifacts when they exist
 - Default directions are:
   - `infra-editorial`
   - `warm-technical`
   - `strange-systems`
-- Generated boards are saved under `taste-boards/` inside the active library root
+- Generated boards are saved under `taste-boards/landing-page/` when direction artifacts exist, otherwise `taste-boards/`
 - This command requires `OPENAI_API_KEY`
 
 ## Profile artifacts
@@ -162,4 +196,9 @@ If Codex still shows the old version, reload Codex or disable/re-enable the plug
 - `design-docs/references/<recordId>/design.md`: per-reference Markdown design system doc
 - `design-docs/library/design-system.json`: library-level design synthesis
 - `design-docs/library/design.md`: library-level Markdown design system doc
+- `design-docs/directions/<directionId>/design-system.json`: evidence-backed direction artifact for downstream design work
+- `design-docs/directions/<directionId>/design.md`: readable direction brief for one branch
+- `landing-page-docs/landing-page-brief.json`: machine-readable landing-page plan for a chosen direction
+- `landing-page-docs/landing-page-brief.md`: human-readable landing-page brief
+- `landing-page-docs/provenance.json`: internal trace from brief decisions back to references and extracted signals
 - `workspace-taste-profile.json`: rolled-up profile stored beside the active library in the current destination
