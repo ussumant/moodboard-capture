@@ -5,7 +5,7 @@ Save inspiration assets into a moodboard library from Codex, build reusable tast
 ## Workbench commands
 
 - `capture_taste`: save inspiration, update the active taste profile, and auto-attempt per-reference design extraction
-- `extract_design_system`: regenerate or refine `design-system.json` and `design.md` for an existing saved reference
+- `extract_design_system`: regenerate or refine the structured ingredient bank in `design-system.json`, plus readable `design.md` and explain artifacts, for an existing saved reference
 - `summarize_taste`: synthesize the active library into a structured taste brief plus library-level design system docs
 - `derive_design_directions`: turn the active library into 2-3 evidence-backed direction variants for downstream design work
 - `plan_landing_page`: turn a chosen direction into a build-ready landing-page brief plus provenance artifacts
@@ -26,9 +26,12 @@ Save inspiration assets into a moodboard library from Codex, build reusable tast
 - Generates per-reference design extraction artifacts under:
   - `design-docs/references/<recordId>/design-system.json`
   - `design-docs/references/<recordId>/design.md`
+  - `design-docs/references/<recordId>/explain.json`
+  - `design-docs/references/<recordId>/explain.md`
 - Generates library-level synthesis under:
   - `design-docs/library/design-system.json`
   - `design-docs/library/design.md`
+- Adds an explicit `ingredients` layer to `design-system.json` so references, directions, and landing-page plans can stay machine-readable and traceable
 - Accepts an optional `userNote`, optional design `facets`, and still supports `tags`, `whyLiked`, and `styleCues` for backward compatibility
 
 ## Destination order
@@ -150,11 +153,13 @@ If Codex still shows the old version, reload Codex or disable/re-enable the plug
 - If analysis is unavailable, the record is saved with both `analysisStatus: "pending"` and `designExtractionStatus: "pending"`
 - If analysis fails after being attempted, the record is saved with failure details and the asset remains intact
 - `design.md` is derived locally from the structured extraction result, not from a second model call
+- `design-system.json` is the canonical machine-readable ingredient bank for references, directions, and landing-page planning
 
 ## Design-system extraction
 
 - `capture_taste` auto-attempts per-reference design extraction on every save
 - `extract_design_system` can re-run design extraction for an existing saved record
+- Per-reference extraction now writes both design docs and explain-mode artifacts so major signals can be traced back to regions, evidence, notes, and references
 - Supported facets are:
   - `colors`
   - `typography`
@@ -175,11 +180,16 @@ If Codex still shows the old version, reload Codex or disable/re-enable the plug
 - `derive_design_directions` writes:
   - `design-docs/directions/<directionId>/design-system.json`
   - `design-docs/directions/<directionId>/design.md`
+  - `design-docs/directions/<directionId>/explain.json`
+  - `design-docs/directions/<directionId>/explain.md`
 - `plan_landing_page` writes:
   - `landing-page-docs/landing-page-brief.json`
   - `landing-page-docs/landing-page-brief.md`
   - `landing-page-docs/provenance.json`
+  - `landing-page-docs/explain.json`
+  - `landing-page-docs/explain.md`
 - `visualize_taste` reads `taste-summary.json` and prefers direction-level design artifacts when they exist
+- `visualize_taste` now uses recipe-level ingredient cues such as materiality, realism, CTA tone, and artifact-display strategy when they exist
 - Default directions are:
   - `infra-editorial`
   - `warm-technical`
@@ -194,11 +204,17 @@ If Codex still shows the old version, reload Codex or disable/re-enable the plug
 - `taste-summary.json`: structured synthesis of stable preferences, anti-patterns, tensions, and branch directions
 - `design-docs/references/<recordId>/design-system.json`: per-reference structured design extraction
 - `design-docs/references/<recordId>/design.md`: per-reference Markdown design system doc
+- `design-docs/references/<recordId>/explain.json`: per-reference machine-readable explain map from ingredients back to evidence
+- `design-docs/references/<recordId>/explain.md`: readable reference-level explain mode
 - `design-docs/library/design-system.json`: library-level design synthesis
 - `design-docs/library/design.md`: library-level Markdown design system doc
 - `design-docs/directions/<directionId>/design-system.json`: evidence-backed direction artifact for downstream design work
 - `design-docs/directions/<directionId>/design.md`: readable direction brief for one branch
+- `design-docs/directions/<directionId>/explain.json`: machine-readable direction explain artifact
+- `design-docs/directions/<directionId>/explain.md`: readable direction explain mode
 - `landing-page-docs/landing-page-brief.json`: machine-readable landing-page plan for a chosen direction
 - `landing-page-docs/landing-page-brief.md`: human-readable landing-page brief
 - `landing-page-docs/provenance.json`: internal trace from brief decisions back to references and extracted signals
+- `landing-page-docs/explain.json`: machine-readable page composition to ingredient mapping
+- `landing-page-docs/explain.md`: readable page-level explain mode
 - `workspace-taste-profile.json`: rolled-up profile stored beside the active library in the current destination

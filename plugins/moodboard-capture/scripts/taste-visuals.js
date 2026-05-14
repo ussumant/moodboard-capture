@@ -327,11 +327,18 @@ function buildTasteVisualPrompt({ direction, summary, libraryDesignSystem, direc
   if (directionArtifact) {
     branchLines.push(
       `Direction overview: ${directionArtifact.overview}`,
+      `Resolved tension: ${directionArtifact.recipe?.resolvedTension || 'none recorded yet'}.`,
+      `Primary ingredient recipe: ${joinList((directionArtifact.recipe?.primaryIngredients || []).map((item) => `${item.label} (${item.family})`))}.`,
+      `Secondary ingredient recipe: ${joinList((directionArtifact.recipe?.secondaryIngredients || []).map((item) => `${item.label} (${item.family})`))}.`,
+      `Suppressed ingredients: ${joinList((directionArtifact.recipe?.intentionallySuppressing || []).map((item) => `${item.label} (${item.family})`), 'none recorded yet')}.`,
       `Direction palette system: ${joinList(directionArtifact.paletteSystem?.recurringTokens)}.`,
       `Direction typography system: ${joinList(directionArtifact.typographySystem?.familyDirection)}.`,
       `Direction composition rules: ${joinList(directionArtifact.compositionRules)}.`,
       `Direction component posture: ${joinList(directionArtifact.componentPosture)}.`,
       `Direction illustration posture: ${joinList(directionArtifact.illustrationPosture)}.`,
+      `Direction materiality ingredients: ${joinList((directionArtifact.ingredients?.visual?.materiality || []).map((item) => item.label), 'none recorded yet')}.`,
+      `Direction realism ingredients: ${joinList((directionArtifact.ingredients?.visual?.realism || []).map((item) => item.label), 'none recorded yet')}.`,
+      `Direction artifact-display ingredients: ${joinList((directionArtifact.ingredients?.pageMaking?.artifactDisplayStrategy || []).map((item) => item.label), 'none recorded yet')}.`,
       `Direction CTA tone: ${joinList(directionArtifact.ctaTone?.principles)}.`,
       `Direction confidence notes: ${joinList(directionArtifact.confidenceNotes)}.`
     );

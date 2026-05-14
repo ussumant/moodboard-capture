@@ -23,16 +23,23 @@
 - Per-reference design-system extraction with:
   - `design-docs/references/<recordId>/design-system.json`
   - `design-docs/references/<recordId>/design.md`
+  - `design-docs/references/<recordId>/explain.json`
+  - `design-docs/references/<recordId>/explain.md`
 - Library-level design synthesis with:
   - `design-docs/library/design-system.json`
   - `design-docs/library/design.md`
 - Evidence-backed direction synthesis with:
   - `design-docs/directions/<directionId>/design-system.json`
   - `design-docs/directions/<directionId>/design.md`
+  - `design-docs/directions/<directionId>/explain.json`
+  - `design-docs/directions/<directionId>/explain.md`
 - Landing-page planning with:
   - `landing-page-docs/landing-page-brief.json`
   - `landing-page-docs/landing-page-brief.md`
   - `landing-page-docs/provenance.json`
+  - `landing-page-docs/explain.json`
+  - `landing-page-docs/explain.md`
+- `design-system.json` now carries an explicit `ingredients` layer so references, directions, and landing-page briefs can stay machine-readable and traceable
 - Taste-visual board generation from the accumulated profile and design synthesis
 - Optional `userNote` input, optional design `facets`, and legacy metadata support
 - Works with `https://`, `http://`, and `file://` URLs
@@ -155,11 +162,13 @@ node ./scripts/cli.js plan-landing-page \
 - If analysis cannot run, the capture is still saved and both analysis layers are marked as pending
 - If analysis fails, the capture is still saved and the failure is recorded in the saved record
 - `design.md` is derived from structured extraction locally, not from a second model call
+- `design-system.json` is the canonical machine-readable ingredient bank for references, directions, and landing-page planning
 
 ## Design-system extraction
 
 - `capture_taste` auto-attempts per-reference design extraction on every save
 - `extract_design_system` can re-run extraction for an existing `recordId`
+- Per-reference extraction also writes explain-mode artifacts that map ingredients back to evidence, regions, user notes, and references
 - Supported focus facets are:
   - `colors`
   - `typography`
@@ -177,7 +186,7 @@ node ./scripts/cli.js plan-landing-page \
 - It also writes library-level design synthesis into `design-docs/library/`
 - `derive_design_directions` turns the current library into 2-3 richer direction artifacts grounded in extracted references
 - `plan_landing_page` turns one chosen direction into a section-by-section brief plus provenance
-- `visualize_taste` uses the taste summary and prefers direction-level design artifacts when present
+- `visualize_taste` uses the taste summary, prefers direction-level design artifacts when present, and consumes recipe-level ingredients such as materiality, realism, CTA tone, and artifact-display strategy
 - By default it renders three branches:
   - `infra-editorial`
   - `warm-technical`

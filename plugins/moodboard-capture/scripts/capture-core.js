@@ -63,6 +63,8 @@ const desktopViewport = {
  * @property {'complete'|'failed'|'pending'} designExtractionStatus
  * @property {string|null} designSystemJsonPath
  * @property {string|null} designMdPath
+ * @property {string|null} designExplainJsonPath
+ * @property {string|null} designExplainMdPath
  * @property {string[]} designFacets
  * @property {Object[]} interestingRegions
  * @property {string|null} designExtractionError
@@ -150,7 +152,7 @@ export async function captureTaste({
           extraction: analysisResult.designSystemExtraction,
         });
         applyDesignExtraction(record, {
-          extraction: analysisResult.designSystemExtraction,
+          extraction: designPaths.extraction,
           designPaths,
         });
       } catch (error) {
@@ -281,6 +283,8 @@ export async function extractDesignSystem({
       libraryRoot,
       designSystemJsonPath: record.designSystemJsonPath || designPaths.designSystemJsonPath,
       designMdPath: record.designMdPath || designPaths.designMdPath,
+      designExplainJsonPath: record.designExplainJsonPath || designPaths.explainJsonPath,
+      designExplainMdPath: record.designExplainMdPath || designPaths.explainMdPath,
       facets: normalizedFacets,
       status: 'complete',
       interestingRegions: Array.isArray(record.interestingRegions) ? record.interestingRegions : [],
@@ -317,7 +321,7 @@ export async function extractDesignSystem({
         extraction: analysisResult.designSystemExtraction,
       });
       applyDesignExtraction(record, {
-        extraction: analysisResult.designSystemExtraction,
+        extraction: writtenPaths.extraction,
         designPaths: writtenPaths,
       });
     }
@@ -335,6 +339,8 @@ export async function extractDesignSystem({
     libraryRoot,
     designSystemJsonPath: record.designSystemJsonPath,
     designMdPath: record.designMdPath,
+    designExplainJsonPath: record.designExplainJsonPath,
+    designExplainMdPath: record.designExplainMdPath,
     facets: record.designFacets,
     status: record.designExtractionStatus,
     interestingRegions: record.interestingRegions,
@@ -481,6 +487,8 @@ function buildBaseLibraryRecord({
     designExtractionStatus: 'pending',
     designSystemJsonPath: null,
     designMdPath: null,
+    designExplainJsonPath: null,
+    designExplainMdPath: null,
     designFacets: facets,
     interestingRegions: [],
     designExtractionError: null,
@@ -504,6 +512,8 @@ function applyDesignExtraction(record, { extraction, designPaths }) {
   record.designExtractionStatus = 'complete';
   record.designSystemJsonPath = designPaths.designSystemJsonPath;
   record.designMdPath = designPaths.designMdPath;
+  record.designExplainJsonPath = designPaths.explainJsonPath || null;
+  record.designExplainMdPath = designPaths.explainMdPath || null;
   record.designFacets = Array.isArray(extraction.facets) ? extraction.facets : record.designFacets;
   record.interestingRegions = Array.isArray(extraction.interestingRegions) ? extraction.interestingRegions : [];
   record.designExtractionError = null;
@@ -535,6 +545,8 @@ function buildCaptureResponse({
     designExtractionStatus: record.designExtractionStatus,
     designSystemJsonPath: record.designSystemJsonPath,
     designMdPath: record.designMdPath,
+    designExplainJsonPath: record.designExplainJsonPath,
+    designExplainMdPath: record.designExplainMdPath,
     designFacets: record.designFacets,
     interestingRegions: record.interestingRegions,
     designExtractionError: record.designExtractionError,

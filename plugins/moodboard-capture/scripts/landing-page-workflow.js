@@ -57,6 +57,8 @@ export function getDirectionDesignPaths({ libraryRoot, directionId }) {
     designRoot,
     designSystemJsonPath: path.join(designRoot, 'design-system.json'),
     designMdPath: path.join(designRoot, 'design.md'),
+    explainJsonPath: path.join(designRoot, 'explain.json'),
+    explainMdPath: path.join(designRoot, 'explain.md'),
   };
 }
 
@@ -67,6 +69,8 @@ export function getLandingPageDocPaths({ libraryRoot }) {
     briefJsonPath: path.join(docsRoot, 'landing-page-brief.json'),
     briefMdPath: path.join(docsRoot, 'landing-page-brief.md'),
     provenancePath: path.join(docsRoot, 'provenance.json'),
+    explainJsonPath: path.join(docsRoot, 'explain.json'),
+    explainMdPath: path.join(docsRoot, 'explain.md'),
   };
 }
 
@@ -120,6 +124,8 @@ export async function deriveDesignDirections({
       thesis: direction.thesis,
       designSystemJsonPath: paths.designSystemJsonPath,
       designMdPath: paths.designMdPath,
+      explainJsonPath: paths.explainJsonPath,
+      explainMdPath: paths.explainMdPath,
       sourceRecordIds: direction.selectedSourceReferences.map((item) => item.recordId),
       confidenceNotes: direction.confidenceNotes,
     });
@@ -190,6 +196,7 @@ export async function planLandingPage({
     libraryRoot,
     brief,
     provenance,
+    direction,
   });
 
   return {
@@ -200,6 +207,8 @@ export async function planLandingPage({
     landingPageBriefPath: writtenPaths.briefJsonPath,
     landingPageBriefMdPath: writtenPaths.briefMdPath,
     provenancePath: writtenPaths.provenancePath,
+    explainPath: writtenPaths.explainJsonPath,
+    explainMdPath: writtenPaths.explainMdPath,
     sourceReferenceIds: brief.sourceReferenceIds,
     reviewCheckpoint: brief.reviewCheckpoint,
   };
@@ -212,6 +221,7 @@ function buildDesignDirection({
   summary,
   libraryDesignSystem,
 }) {
+  const directionIngredients = buildDirectionIngredientLayer(selectedSources);
   const paletteTokens = uniqueStrings(selectedSources.flatMap((item) => item.extraction.colors?.brandTokens?.map((token) => `${token.name}: ${token.role}`) || []));
   const surfaceTokens = uniqueStrings(selectedSources.flatMap((item) => item.extraction.colors?.surfaceTokens?.map((token) => `${token.name}: ${token.role}`) || []));
   const familyDirection = uniqueStrings(selectedSources.flatMap((item) => item.extraction.typography?.fontFamilies?.map((family) => `${family.name}: ${family.role}`) || []));
@@ -257,6 +267,14 @@ function buildDesignDirection({
       branch,
       selectedSources,
       summary,
+    }),
+    ingredients: directionIngredients,
+    recipe: buildDirectionRecipe({
+      directionId,
+      branch,
+      summary,
+      selectedSources,
+      ingredients: directionIngredients,
     }),
     paletteSystem: {
       summary: `This direction uses ${joinList(branch.paletteNotes, 'controlled contrast')} to create a distinct landing-page palette without drifting into generic SaaS color defaults.`,
@@ -316,6 +334,155 @@ function buildDesignDirection({
   };
 }
 
+function buildDirectionIngredientLayer(selectedSources) {
+  const families = {
+    visual: ['typography', 'palette', 'layoutRhythm', 'imageryMode', 'materiality', 'realism', 'mood', 'antiPatterns'],
+    pageMaking: ['heroPosture', 'proofStyle', 'ctaTone', 'sectionPacing', 'installVisibility', 'artifactDisplayStrategy'],
+  };
+
+  return {
+    visual: Object.fromEntries(families.visual.map((family) => [
+      family,
+      aggregateDirectionIngredientFamily(selectedSources, 'visual', family),
+    ])),
+    pageMaking: Object.fromEntries(families.pageMaking.map((family) => [
+      family,
+      aggregateDirectionIngredientFamily(selectedSources, 'pageMaking', family),
+    ])),
+  };
+}
+
+function aggregateDirectionIngredientFamily(selectedSources, scope, family) {
+  const grouped = new Map();
+
+  for (const source of selectedSources) {
+    const items = Array.isArray(source.extraction?.ingredients?.[scope]?.[family])
+      ? source.extraction.ingredients[scope][family]
+      : [];
+
+    for (const item of items) {
+      const key = item.id || `${scope}.${family}:${item.label}`;
+      const existing = grouped.get(key);
+      if (!existing) {
+        grouped.set(key, {
+          ...item,
+          family: `${scope}.${family}`,
+          sourceRecordIds: uniqueStrings([
+            ...(item.sourceRecordIds || []),
+            source.record.id,
+          ]),
+          count: 1,
+        });
+        continue;
+      }
+
+      existing.count += 1;
+      existing.sourceRecordIds = uniqueStrings([
+        ...existing.sourceRecordIds,
+        source.record.id,
+      ]);
+      existing.signals = uniqueStrings([
+        ...(existing.signals || []),
+        ...(item.signals || []),
+      ]).slice(0, 8);
+      existing.sourcePointers = dedupePointers([
+        ...(existing.sourcePointers || []),
+        ...(item.sourcePointers || []),
+      ]).slice(0, 8);
+    }
+  }
+
+  return Array.from(grouped.values())
+    .sort((left, right) => {
+      if ((right.count || 0) !== (left.count || 0)) {
+        return (right.count || 0) - (left.count || 0);
+      }
+      return left.label.localeCompare(right.label);
+    })
+    .slice(0, 8);
+}
+
+function buildDirectionRecipe({
+  directionId,
+  branch,
+  summary,
+  selectedSources,
+  ingredients,
+}) {
+  const prioritized = prioritizeDirectionIngredients({ directionId, ingredients });
+  const primary = prioritized.slice(0, 6);
+  const secondary = prioritized.slice(6, 12);
+  const suppressed = (ingredients.visual.antiPatterns || []).slice(0, 6);
+
+  return {
+    primaryIngredientIds: primary.map((item) => item.id),
+    secondaryIngredientIds: secondary.map((item) => item.id),
+    suppressedIngredientIds: suppressed.map((item) => item.id),
+    primaryIngredients: primary.map(summarizeIngredientRef),
+    secondaryIngredients: secondary.map(summarizeIngredientRef),
+    intentionallySuppressing: suppressed.map(summarizeIngredientRef),
+    resolvedTension: chooseResolvedTension({ directionId, summary }),
+    sourceReferenceWeights: selectedSources.map((source, index) => ({
+      recordId: source.record.id,
+      weight: Math.max(1, 3 - index),
+      whySelected: source.whySelected,
+    })),
+  };
+}
+
+function buildPageComposition(direction) {
+  return {
+    hero: {
+      ingredientIds: pickIngredientIds(direction.ingredients, [
+        ['pageMaking', 'heroPosture'],
+        ['visual', 'palette'],
+        ['visual', 'imageryMode'],
+      ]),
+      rationale: 'The hero should carry the strongest first-impression ingredients so the page reads as a point of view immediately.',
+    },
+    proofStrip: {
+      ingredientIds: pickIngredientIds(direction.ingredients, [
+        ['pageMaking', 'proofStyle'],
+        ['visual', 'layoutRhythm'],
+        ['visual', 'realism'],
+      ]),
+      rationale: 'The proof strip should make the workflow feel believable through concrete artifacts and visible realism.',
+    },
+    installSection: {
+      ingredientIds: pickIngredientIds(direction.ingredients, [
+        ['pageMaking', 'installVisibility'],
+        ['pageMaking', 'ctaTone'],
+        ['visual', 'typography'],
+      ]),
+      rationale: 'Install should stay obvious without overpowering the page story.',
+    },
+    artifactDisplay: {
+      ingredientIds: pickIngredientIds(direction.ingredients, [
+        ['pageMaking', 'artifactDisplayStrategy'],
+        ['visual', 'materiality'],
+        ['visual', 'imageryMode'],
+      ]),
+      rationale: 'Artifact display should show proof in the same material and realism register as the selected direction.',
+    },
+    ctaRhythm: {
+      ingredientIds: pickIngredientIds(direction.ingredients, [
+        ['pageMaking', 'ctaTone'],
+        ['pageMaking', 'sectionPacing'],
+        ['visual', 'palette'],
+      ]),
+      rationale: 'CTA repetition should feel intentional and earned by the section rhythm.',
+    },
+    closingSection: {
+      ingredientIds: pickIngredientIds(direction.ingredients, [
+        ['pageMaking', 'sectionPacing'],
+        ['visual', 'mood'],
+        ['visual', 'palette'],
+      ]),
+      rationale: 'The ending should echo the hero ingredients, but with simpler pacing and a single clear action.',
+    },
+  };
+}
+
 function buildLandingPageBrief({
   direction,
   summary,
@@ -353,13 +520,17 @@ function buildLandingPageBrief({
       usagePrinciples: direction.typographySystem.usagePrinciples.slice(0, 6),
     },
     colorSystem: {
-      foundation: direction.paletteSystem.recurringTokens.slice(0, 6),
-      accents: direction.paletteSystem.usageNotes.slice(0, 4),
+      foundation: direction.paletteSystem.recurringTokens.slice(0, 4),
+      accents: uniqueStrings(
+        direction.paletteSystem.recurringTokens.filter((token) =>
+          /(accent|yellow|green|red|lime|bright)/i.test(token)
+        )
+      ).slice(0, 4),
       usagePrinciples: [
         'Let the hero carry the strongest contrast and the body sections carry proof and readability.',
         'Keep CTA accents rare enough that install actions feel intentional.',
-        ...direction.paletteSystem.usageNotes.slice(0, 2),
-      ].slice(0, 6),
+        'Keep any new accent or surface treatment subordinate to the palette already proven by the references.',
+      ],
     },
     illustrationSystem: {
       primaryMotifs: direction.illustrationPosture.slice(0, 5),
@@ -401,6 +572,7 @@ function buildLandingPageBrief({
         'Keep mobile behavior orientation-friendly so install and proof never get buried.',
       ],
     },
+    pageComposition: buildPageComposition(direction),
     sectionPlan: buildSectionPlan({
       direction,
       summary,
@@ -486,6 +658,7 @@ async function writeDirectionArtifacts({ libraryRoot, direction }) {
     libraryRoot,
     directionId: direction.id,
   });
+  const explain = buildDirectionExplainArtifact(direction);
 
   await fs.mkdir(paths.designRoot, { recursive: true });
   await fs.writeFile(
@@ -498,16 +671,33 @@ async function writeDirectionArtifacts({ libraryRoot, direction }) {
     `${renderDirectionMarkdown(direction)}\n`,
     'utf8'
   );
+  await fs.writeFile(
+    paths.explainJsonPath,
+    `${JSON.stringify(explain, null, 2)}\n`,
+    'utf8'
+  );
+  await fs.writeFile(
+    paths.explainMdPath,
+    `${renderDirectionExplainMarkdown(explain)}\n`,
+    'utf8'
+  );
 
   return paths;
 }
 
-async function writeLandingPageArtifacts({ libraryRoot, brief, provenance }) {
+async function writeLandingPageArtifacts({ libraryRoot, brief, provenance, direction }) {
   const paths = getLandingPageDocPaths({ libraryRoot });
+  const explain = buildLandingPageExplainArtifact({
+    brief,
+    provenance,
+    direction,
+  });
   await fs.mkdir(paths.docsRoot, { recursive: true });
   await fs.writeFile(paths.briefJsonPath, `${JSON.stringify(brief, null, 2)}\n`, 'utf8');
   await fs.writeFile(paths.briefMdPath, `${renderLandingPageBriefMarkdown(brief)}\n`, 'utf8');
   await fs.writeFile(paths.provenancePath, `${JSON.stringify(provenance, null, 2)}\n`, 'utf8');
+  await fs.writeFile(paths.explainJsonPath, `${JSON.stringify(explain, null, 2)}\n`, 'utf8');
+  await fs.writeFile(paths.explainMdPath, `${renderLandingPageExplainMarkdown(explain)}\n`, 'utf8');
   return paths;
 }
 
@@ -610,6 +800,90 @@ function scoreReferenceForDirection({ directionId, branch, reference }) {
     score,
     whySelected: uniqueStrings(matchedReasons).slice(0, 3).join('; '),
   };
+}
+
+function prioritizeDirectionIngredients({ directionId, ingredients }) {
+  const all = flattenDirectionIngredients(ingredients).filter((item) => item.family !== 'visual.antiPatterns');
+  const keywordMap = {
+    'infra-editorial': ['contrast', 'system', 'technical', 'proof', 'grid', 'realism', 'hero', 'artifact'],
+    'warm-technical': ['warm', 'human', 'tactile', 'material', 'artifact', 'approachable', 'realism', 'pinned'],
+    'strange-systems': ['pixel', 'memorable', 'strange', 'experimental', 'uncanny', 'playful', 'abstract'],
+  };
+  const keywords = keywordMap[directionId] || [];
+
+  return all
+    .map((item) => ({
+      ...item,
+      _priority: scoreIngredientPriority(item, keywords),
+    }))
+    .sort((left, right) => {
+      if (right._priority !== left._priority) {
+        return right._priority - left._priority;
+      }
+      if ((right.count || 0) !== (left.count || 0)) {
+        return (right.count || 0) - (left.count || 0);
+      }
+      return left.label.localeCompare(right.label);
+    });
+}
+
+function scoreIngredientPriority(item, keywords) {
+  const blob = [
+    item.label,
+    item.detail || '',
+    ...(item.signals || []),
+    item.family,
+  ].join(' ').toLowerCase();
+
+  let score = item.count || 0;
+  for (const keyword of keywords) {
+    if (blob.includes(keyword)) {
+      score += 2;
+    }
+  }
+  if (item.family.startsWith('pageMaking.')) {
+    score += 1;
+  }
+  return score;
+}
+
+function flattenDirectionIngredients(ingredients) {
+  return [
+    ...Object.values(ingredients.visual || {}).flat(),
+    ...Object.values(ingredients.pageMaking || {}).flat(),
+  ];
+}
+
+function summarizeIngredientRef(item) {
+  return {
+    id: item.id,
+    label: item.label,
+    family: item.family,
+    sourceRecordIds: item.sourceRecordIds || [],
+  };
+}
+
+function chooseResolvedTension({ directionId, summary }) {
+  const preferred = {
+    'infra-editorial': 'Technical rigor vs human warmth',
+    'warm-technical': 'Digital precision vs tactile texture',
+    'strange-systems': 'Functional product proof vs abstract brand storytelling',
+  }[directionId];
+
+  if (summary.tensions.includes(preferred)) {
+    return preferred;
+  }
+
+  return summary.tensions[0] || 'Clarity vs distinctiveness';
+}
+
+function pickIngredientIds(ingredients, familyPairs) {
+  const ids = [];
+  for (const [scope, family] of familyPairs) {
+    const items = Array.isArray(ingredients?.[scope]?.[family]) ? ingredients[scope][family] : [];
+    ids.push(...items.slice(0, 2).map((item) => item.id));
+  }
+  return uniqueStrings(ids);
 }
 
 function buildDirectionOverview({ directionId, branch, selectedSources, summary }) {
@@ -753,6 +1027,39 @@ function buildGeneratedImageTargets(direction) {
   ];
 }
 
+function buildDirectionExplainArtifact(direction) {
+  return {
+    generatedAt: new Date().toISOString(),
+    level: 'direction',
+    directionId: direction.id,
+    thesis: direction.thesis,
+    recipe: direction.recipe,
+    ingredients: direction.ingredients,
+    selectedSourceReferences: direction.selectedSourceReferences,
+    explanation: {
+      primary: direction.recipe.primaryIngredients,
+      secondary: direction.recipe.secondaryIngredients,
+      suppressed: direction.recipe.intentionallySuppressing,
+      resolvedTension: direction.recipe.resolvedTension,
+    },
+  };
+}
+
+function buildLandingPageExplainArtifact({ brief, provenance, direction }) {
+  return {
+    generatedAt: new Date().toISOString(),
+    level: 'landing-page',
+    directionId: brief.directionId,
+    pageThesis: brief.pageThesis,
+    pageComposition: brief.pageComposition,
+    sourceReferenceIds: brief.sourceReferenceIds,
+    selectedSourceReferences: direction.selectedSourceReferences,
+    recipe: direction.recipe,
+    ingredients: direction.ingredients,
+    decisions: provenance.decisions,
+  };
+}
+
 function renderDirectionMarkdown(direction) {
   const lines = [
     `# ${direction.id}`,
@@ -765,6 +1072,16 @@ function renderDirectionMarkdown(direction) {
     '',
     direction.overview,
     '',
+    '## Ingredient Recipe',
+    '',
+    `Resolved tension: ${direction.recipe.resolvedTension}`,
+    '',
+    ...renderBulletBlock('Primary Ingredients', direction.recipe.primaryIngredients.map((item) => `${item.label} (${item.family})`)),
+    ...renderBulletBlock('Secondary Ingredients', direction.recipe.secondaryIngredients.map((item) => `${item.label} (${item.family})`)),
+    ...renderBulletBlock('Intentionally Suppressing', direction.recipe.intentionallySuppressing.map((item) => `${item.label} (${item.family})`)),
+    '## Ingredients',
+    '',
+    ...renderIngredientLayer(direction.ingredients),
     '## Palette System',
     '',
     direction.paletteSystem.summary,
@@ -854,6 +1171,9 @@ function renderLandingPageBriefMarkdown(brief) {
       ...brief.illustrationSystem.styleRules,
       ...brief.illustrationSystem.avoid,
     ]),
+    '## Page Composition',
+    '',
+    ...renderPageComposition(brief.pageComposition),
     '## Section Plan',
     '',
     ...brief.sectionPlan.flatMap((section) => [
@@ -896,6 +1216,62 @@ function renderLandingPageBriefMarkdown(brief) {
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd();
 }
 
+function renderDirectionExplainMarkdown(explain) {
+  const lines = [
+    '# Direction Explain',
+    '',
+    `Direction: ${explain.directionId}`,
+    '',
+    `Thesis: ${explain.thesis}`,
+    '',
+    `Resolved tension: ${explain.explanation.resolvedTension}`,
+    '',
+    ...renderBulletBlock('Primary Ingredients', explain.explanation.primary.map((item) => `${item.label} (${item.family})`)),
+    ...renderBulletBlock('Secondary Ingredients', explain.explanation.secondary.map((item) => `${item.label} (${item.family})`)),
+    ...renderBulletBlock('Suppressed Ingredients', explain.explanation.suppressed.map((item) => `${item.label} (${item.family})`)),
+    '## Ingredient Layer',
+    '',
+    ...renderIngredientLayer(explain.ingredients),
+    '## Source References',
+    '',
+    ...explain.selectedSourceReferences.flatMap((item) => [
+      `- ${item.recordId}${item.sourceUrl ? ` — ${item.sourceUrl}` : ''}`,
+      `Why selected: ${item.whySelected}`,
+    ]),
+  ];
+
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd();
+}
+
+function renderLandingPageExplainMarkdown(explain) {
+  const lines = [
+    '# Landing Page Explain',
+    '',
+    `Direction: ${explain.directionId}`,
+    '',
+    `Page thesis: ${explain.pageThesis}`,
+    '',
+    '## Page Composition',
+    '',
+    ...renderPageComposition(explain.pageComposition),
+    '## Ingredient Layer',
+    '',
+    ...renderIngredientLayer(explain.ingredients),
+    '## Decision Mapping',
+    '',
+    ...Object.entries(explain.decisions).flatMap(([key, value]) => [
+      `### ${key}`,
+      '',
+      `Rationale: ${value.rationale}`,
+      '',
+      ...renderBulletList((value.directionSignals || []).map((item) => String(item))),
+      '',
+    ]),
+  ];
+
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd();
+}
+
 function renderBulletBlock(title, items) {
   return [
     `### ${title}`,
@@ -903,6 +1279,50 @@ function renderBulletBlock(title, items) {
     ...renderBulletList(items),
     '',
   ];
+}
+
+function renderIngredientLayer(layer) {
+  const lines = [];
+  for (const [scope, families] of Object.entries(layer || {})) {
+    lines.push(`### ${scope === 'visual' ? 'Visual' : 'Page-Making'} Ingredients`, '');
+    for (const [family, items] of Object.entries(families || {})) {
+      lines.push(`#### ${family}`, '');
+      if (!Array.isArray(items) || items.length === 0) {
+        lines.push('- None recorded yet.', '');
+        continue;
+      }
+      for (const item of items) {
+        lines.push(`- **${item.label}**${item.detail ? `: ${item.detail}` : ''}`);
+        if (Array.isArray(item.signals) && item.signals.length > 0) {
+          lines.push(`Signals: ${item.signals.join(', ')}`);
+        }
+        if (Array.isArray(item.sourceRecordIds) && item.sourceRecordIds.length > 0) {
+          lines.push(`Sources: ${item.sourceRecordIds.join(', ')}`);
+        }
+      }
+      lines.push('');
+    }
+  }
+  return lines;
+}
+
+function renderPageComposition(pageComposition) {
+  const labels = {
+    hero: 'Hero',
+    proofStrip: 'Proof Strip',
+    installSection: 'Install Section',
+    artifactDisplay: 'Artifact Display',
+    ctaRhythm: 'CTA Rhythm',
+    closingSection: 'Closing Section',
+  };
+  const lines = [];
+  for (const [key, value] of Object.entries(pageComposition || {})) {
+    lines.push(`### ${labels[key] || key}`, '');
+    lines.push(`Rationale: ${value.rationale}`, '');
+    lines.push(...renderBulletList((value.ingredientIds || []).map((id) => `Ingredient: ${id}`)));
+    lines.push('');
+  }
+  return lines;
 }
 
 function renderBulletList(items) {
@@ -930,6 +1350,7 @@ function buildReferenceCorpus(reference) {
     ...(reference.extraction.layout?.spacingSystem || []),
     ...(reference.extraction.imageryIllustration?.styles || []),
     ...(reference.extraction.imageryIllustration?.behaviors || []),
+    ...flattenDirectionIngredients(reference.extraction.ingredients || buildDirectionIngredientLayer([])).map((item) => `${item.label} ${item.detail || ''}`),
     ...(reference.extraction.motionInteraction?.patterns || []),
     ...(reference.extraction.components || []).map((component) => `${component.name} ${component.description} ${(component.properties || []).join(' ')}`),
   ].join(' ');
@@ -989,4 +1410,21 @@ function uniqueStrings(values) {
     normalized.push(trimmed);
   }
   return normalized;
+}
+
+function dedupePointers(pointers) {
+  const deduped = [];
+  const seen = new Set();
+  for (const pointer of pointers || []) {
+    if (!pointer?.kind || !pointer?.value) {
+      continue;
+    }
+    const key = `${pointer.kind}:${pointer.value}:${pointer.note || ''}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    deduped.push(pointer);
+  }
+  return deduped;
 }

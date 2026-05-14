@@ -94,6 +94,7 @@ export async function summarizeTaste({
 export function buildTasteSummary({ profile, records, designReferences = [] }) {
   const complete = records.filter((record) => record?.analysisStatus === 'complete' && record?.tasteAnalysis);
   const signalGroups = collectSignals(complete, designReferences);
+  const ingredientPatterns = collectIngredientPatterns(designReferences);
 
   const stablePreferences = uniqueStrings([
     ...profile.recurringPreferences.slice(0, 4),
@@ -120,6 +121,7 @@ export function buildTasteSummary({ profile, records, designReferences = [] }) {
     tensions,
     branchDirections,
     summary: readableSummary,
+    ingredientPatterns,
     sourceSignals: {
       captureCount: profile.captureCount,
       recurringMoods: profile.recurringMoods,
@@ -192,6 +194,54 @@ function collectSignals(records, designReferences) {
     avoids: uniqueStrings(avoids),
     designCharacteristics: uniqueStrings(designCharacteristics),
   };
+}
+
+function collectIngredientPatterns(designReferences) {
+  const families = {
+    visual: {
+      typography: [],
+      palette: [],
+      layoutRhythm: [],
+      imageryMode: [],
+      materiality: [],
+      realism: [],
+      mood: [],
+      antiPatterns: [],
+    },
+    pageMaking: {
+      heroPosture: [],
+      proofStyle: [],
+      ctaTone: [],
+      sectionPacing: [],
+      installVisibility: [],
+      artifactDisplayStrategy: [],
+    },
+  };
+
+  for (const item of designReferences) {
+    const ingredients = item?.extraction?.ingredients;
+    if (!ingredients) {
+      continue;
+    }
+
+    for (const [family, values] of Object.entries(families.visual)) {
+      const source = Array.isArray(ingredients.visual?.[family]) ? ingredients.visual[family] : [];
+      families.visual[family] = uniqueStrings([
+        ...values,
+        ...source.map((ingredient) => ingredient.label),
+      ]).slice(0, 6);
+    }
+
+    for (const [family, values] of Object.entries(families.pageMaking)) {
+      const source = Array.isArray(ingredients.pageMaking?.[family]) ? ingredients.pageMaking[family] : [];
+      families.pageMaking[family] = uniqueStrings([
+        ...values,
+        ...source.map((ingredient) => ingredient.label),
+      ]).slice(0, 6);
+    }
+  }
+
+  return families;
 }
 
 function inferTensions({ profile, signalGroups }) {

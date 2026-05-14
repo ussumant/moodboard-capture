@@ -46,6 +46,8 @@ export function getReferenceDesignPaths({ libraryRoot, recordId }) {
     designRoot,
     designSystemJsonPath: path.join(designRoot, 'design-system.json'),
     designMdPath: path.join(designRoot, 'design.md'),
+    explainJsonPath: path.join(designRoot, 'explain.json'),
+    explainMdPath: path.join(designRoot, 'explain.md'),
   };
 }
 
@@ -56,6 +58,8 @@ export function resolveReferenceDesignPaths({ libraryRoot, record }) {
       designRoot: record?.designSystemJsonPath ? path.dirname(record.designSystemJsonPath) : null,
       designSystemJsonPath: record?.designSystemJsonPath || null,
       designMdPath: record?.designMdPath || null,
+      explainJsonPath: record?.designExplainJsonPath || null,
+      explainMdPath: record?.designExplainMdPath || null,
     };
   }
 
@@ -68,6 +72,8 @@ export function resolveReferenceDesignPaths({ libraryRoot, record }) {
     designRoot: fallback.designRoot,
     designSystemJsonPath: record?.designSystemJsonPath || fallback.designSystemJsonPath,
     designMdPath: record?.designMdPath || fallback.designMdPath,
+    explainJsonPath: record?.designExplainJsonPath || fallback.explainJsonPath,
+    explainMdPath: record?.designExplainMdPath || fallback.explainMdPath,
   };
 }
 
@@ -78,6 +84,184 @@ export function getLibraryDesignPaths({ libraryRoot }) {
     designSystemJsonPath: path.join(designRoot, 'design-system.json'),
     designMdPath: path.join(designRoot, 'design.md'),
   };
+}
+
+function buildEmptyIngredientLayer() {
+  return {
+    visual: {
+      typography: [],
+      palette: [],
+      layoutRhythm: [],
+      imageryMode: [],
+      materiality: [],
+      realism: [],
+      mood: [],
+      antiPatterns: [],
+    },
+    pageMaking: {
+      heroPosture: [],
+      proofStyle: [],
+      ctaTone: [],
+      sectionPacing: [],
+      installVisibility: [],
+      artifactDisplayStrategy: [],
+    },
+  };
+}
+
+function normalizeIngredientItem(value, family) {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const label = normalizeText(value.label);
+  if (!label) {
+    return null;
+  }
+
+  const normalizedFamily = family || normalizeText(value.family) || 'ingredient';
+  const id = normalizeText(value.id) || `${slugify(normalizedFamily)}-${slugify(label)}`;
+  const sourcePointers = Array.isArray(value.sourcePointers)
+    ? value.sourcePointers
+        .filter((item) => item && typeof item === 'object' && normalizeText(item.kind) && normalizeText(item.value))
+        .map((item) => ({
+          kind: normalizeText(item.kind),
+          value: normalizeText(item.value),
+          note: normalizeText(item.note),
+        }))
+    : [];
+
+  return {
+    id,
+    family: normalizedFamily,
+    label,
+    detail: normalizeText(value.detail),
+    signals: normalizeStringArray(value.signals),
+    sourcePointers,
+    sourceRecordIds: normalizeStringArray(value.sourceRecordIds),
+    count: Number.isFinite(value.count) ? value.count : undefined,
+    role: normalizeText(value.role),
+  };
+}
+
+function normalizeIngredientItems(value, family) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const items = [];
+  const seen = new Set();
+  for (const item of value) {
+    const normalized = normalizeIngredientItem(item, family);
+    if (!normalized || seen.has(normalized.id)) {
+      continue;
+    }
+    seen.add(normalized.id);
+    items.push(normalized);
+  }
+  return items;
+}
+
+function normalizeIngredientLayer(value) {
+  const empty = buildEmptyIngredientLayer();
+  if (!value || typeof value !== 'object') {
+    return empty;
+  }
+
+  return {
+    visual: {
+      typography: normalizeIngredientItems(value.visual?.typography, 'visual.typography'),
+      palette: normalizeIngredientItems(value.visual?.palette, 'visual.palette'),
+      layoutRhythm: normalizeIngredientItems(value.visual?.layoutRhythm, 'visual.layoutRhythm'),
+      imageryMode: normalizeIngredientItems(value.visual?.imageryMode, 'visual.imageryMode'),
+      materiality: normalizeIngredientItems(value.visual?.materiality, 'visual.materiality'),
+      realism: normalizeIngredientItems(value.visual?.realism, 'visual.realism'),
+      mood: normalizeIngredientItems(value.visual?.mood, 'visual.mood'),
+      antiPatterns: normalizeIngredientItems(value.visual?.antiPatterns, 'visual.antiPatterns'),
+    },
+    pageMaking: {
+      heroPosture: normalizeIngredientItems(value.pageMaking?.heroPosture, 'pageMaking.heroPosture'),
+      proofStyle: normalizeIngredientItems(value.pageMaking?.proofStyle, 'pageMaking.proofStyle'),
+      ctaTone: normalizeIngredientItems(value.pageMaking?.ctaTone, 'pageMaking.ctaTone'),
+      sectionPacing: normalizeIngredientItems(value.pageMaking?.sectionPacing, 'pageMaking.sectionPacing'),
+      installVisibility: normalizeIngredientItems(value.pageMaking?.installVisibility, 'pageMaking.installVisibility'),
+      artifactDisplayStrategy: normalizeIngredientItems(value.pageMaking?.artifactDisplayStrategy, 'pageMaking.artifactDisplayStrategy'),
+    },
+  };
+}
+
+function buildIngredientItem({
+  family,
+  label,
+  detail,
+  signals,
+  sourcePointers,
+  sourceRecordIds,
+  count,
+  role,
+}) {
+  return normalizeIngredientItem({
+    id: `${slugify(family)}-${slugify(label)}`,
+    family,
+    label,
+    detail,
+    signals,
+    sourcePointers,
+    sourceRecordIds,
+    count,
+    role,
+  }, family);
+}
+
+function buildSourcePointers({ record, extraction, signals, fallbackKind = 'evidence' }) {
+  const pointers = [];
+  for (const region of extraction.interestingRegions || []) {
+    pointers.push({
+      kind: 'region',
+      value: region.title,
+      note: region.whyItMatters,
+    });
+  }
+  for (const signal of normalizeStringArray(signals).slice(0, 4)) {
+    pointers.push({
+      kind: fallbackKind,
+      value: signal,
+      note: null,
+    });
+  }
+  if (record?.userNote) {
+    pointers.push({
+      kind: 'note',
+      value: record.userNote,
+      note: 'user note',
+    });
+  }
+  if (record?.sourceUrl) {
+    pointers.push({
+      kind: 'reference',
+      value: record.sourceUrl,
+      note: 'captured source',
+    });
+  }
+
+  return dedupePointers(pointers).slice(0, 8);
+}
+
+function dedupePointers(pointers) {
+  const deduped = [];
+  const seen = new Set();
+  for (const pointer of pointers) {
+    if (!pointer?.kind || !pointer?.value) {
+      continue;
+    }
+    const key = `${pointer.kind}:${pointer.value}:${pointer.note || ''}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    deduped.push(pointer);
+  }
+  return deduped;
 }
 
 export function buildFallbackDesignSystemExtraction({
@@ -319,7 +503,251 @@ export function normalizeDesignSystemExtraction(raw, { facets } = {}) {
     dos: normalizeStringArray(raw?.dos),
     donts: normalizeStringArray(raw?.donts),
     sourceEvidence: normalizeStringArray(raw?.sourceEvidence),
+    ingredients: normalizeIngredientLayer(raw?.ingredients),
   };
+}
+
+export function hydrateReferenceDesignExtraction({ record, extraction }) {
+  const normalized = normalizeDesignSystemExtraction(extraction, {
+    facets: extraction?.facets,
+  });
+  const derivedIngredients = hasAnyIngredientItems(normalized.ingredients)
+    ? normalized.ingredients
+    : deriveReferenceIngredientLayer({
+        record,
+        extraction: normalized,
+      });
+
+  return {
+    ...normalized,
+    ingredients: derivedIngredients,
+  };
+}
+
+function deriveReferenceIngredientLayer({ record, extraction }) {
+  const materials = normalizeStringArray([
+    ...(record?.tasteAnalysis?.visualTraits?.materials || []),
+    ...(record?.tasteAnalysis?.profileContributions?.preferredMaterials || []),
+  ]);
+  const moods = normalizeStringArray([
+    ...(record?.tasteAnalysis?.visualTraits?.mood || []),
+    ...(record?.tasteAnalysis?.profileContributions?.preferredMoods || []),
+    ...(extraction.keyCharacteristics || []),
+  ]);
+  const layoutSignals = normalizeStringArray([
+    ...(extraction.layout.spacingSystem || []),
+    ...(extraction.layout.gridNotes || []),
+    ...(record?.tasteAnalysis?.visualTraits?.composition || []),
+  ]);
+  const paletteSignals = normalizeStringArray([
+    ...(extraction.colors.gradientNotes || []),
+    ...(record?.tasteAnalysis?.visualTraits?.colorTreatment || []),
+  ]);
+  const imagerySignals = normalizeStringArray([
+    ...(extraction.imageryIllustration.styles || []),
+    ...(extraction.imageryIllustration.behaviors || []),
+    ...(record?.tasteAnalysis?.visualTraits?.imagery || []),
+  ]);
+  const typographySignals = normalizeStringArray([
+    ...extraction.typography.principles,
+    ...(record?.tasteAnalysis?.visualTraits?.typography || []),
+  ]);
+  const antiPatternSignals = normalizeStringArray([
+    ...extraction.donts,
+    ...(record?.tasteAnalysis?.profileContributions?.avoidedPatterns || []),
+  ]);
+  const realismSignals = buildRealismSignals({
+    record,
+    extraction,
+    materials,
+    imagerySignals,
+  });
+
+  return {
+    visual: {
+      typography: [
+        buildIngredientItem({
+          family: 'visual.typography',
+          label: extraction.typography.fontFamilies[0]?.name
+            ? `${extraction.typography.fontFamilies[0].name} hierarchy`
+            : 'Readable hierarchy',
+          detail: extraction.typography.summary,
+          signals: typographySignals.slice(0, 6),
+          sourcePointers: buildSourcePointers({ record, extraction, signals: typographySignals }),
+          sourceRecordIds: record?.id ? [record.id] : [],
+        }),
+      ].filter(Boolean),
+      palette: [
+        buildIngredientItem({
+          family: 'visual.palette',
+          label: extraction.colors.brandTokens[0]?.name
+            ? `${extraction.colors.brandTokens[0].name} contrast system`
+            : 'Controlled palette contrast',
+          detail: extraction.colors.summary,
+          signals: [
+            ...paletteSignals.slice(0, 4),
+            ...extraction.colors.brandTokens.slice(0, 3).map((token) => `${token.name}: ${token.role}`),
+          ],
+          sourcePointers: buildSourcePointers({ record, extraction, signals: paletteSignals }),
+          sourceRecordIds: record?.id ? [record.id] : [],
+        }),
+      ].filter(Boolean),
+      layoutRhythm: [
+        buildIngredientItem({
+          family: 'visual.layoutRhythm',
+          label: record?.sourceType === 'local-image' ? 'Tactile grid rhythm' : 'Modular section rhythm',
+          detail: extraction.layout.summary,
+          signals: layoutSignals.slice(0, 6),
+          sourcePointers: buildSourcePointers({ record, extraction, signals: layoutSignals }),
+          sourceRecordIds: record?.id ? [record.id] : [],
+        }),
+      ].filter(Boolean),
+      imageryMode: [
+        buildIngredientItem({
+          family: 'visual.imageryMode',
+          label: imagerySignals[0] || 'System-aware imagery',
+          detail: extraction.imageryIllustration.summary,
+          signals: imagerySignals.slice(0, 6),
+          sourcePointers: buildSourcePointers({ record, extraction, signals: imagerySignals }),
+          sourceRecordIds: record?.id ? [record.id] : [],
+        }),
+      ].filter(Boolean),
+      materiality: [
+        buildIngredientItem({
+          family: 'visual.materiality',
+          label: buildMaterialityLabel(materials),
+          detail: materials[0] || extraction.imageryIllustration.summary,
+          signals: materials.slice(0, 6),
+          sourcePointers: buildSourcePointers({ record, extraction, signals: materials }),
+          sourceRecordIds: record?.id ? [record.id] : [],
+        }),
+      ].filter(Boolean),
+      realism: [
+        buildIngredientItem({
+          family: 'visual.realism',
+          label: realismSignals.label,
+          detail: realismSignals.detail,
+          signals: realismSignals.signals,
+          sourcePointers: buildSourcePointers({ record, extraction, signals: realismSignals.signals }),
+          sourceRecordIds: record?.id ? [record.id] : [],
+        }),
+      ].filter(Boolean),
+      mood: [
+        buildIngredientItem({
+          family: 'visual.mood',
+          label: moods[0] || 'Credible tone',
+          detail: extraction.overview,
+          signals: moods.slice(0, 6),
+          sourcePointers: buildSourcePointers({ record, extraction, signals: moods }),
+          sourceRecordIds: record?.id ? [record.id] : [],
+        }),
+      ].filter(Boolean),
+      antiPatterns: antiPatternSignals.slice(0, 6).map((signal) =>
+        buildIngredientItem({
+          family: 'visual.antiPatterns',
+          label: signal,
+          detail: 'Avoid weakening the core taste signal with this pattern.',
+          signals: [signal],
+          sourcePointers: buildSourcePointers({ record, extraction, signals: [signal] }),
+          sourceRecordIds: record?.id ? [record.id] : [],
+          role: 'suppressed',
+        })
+      ).filter(Boolean),
+    },
+    pageMaking: {
+      heroPosture: [
+        buildIngredientItem({
+          family: 'pageMaking.heroPosture',
+          label: buildHeroPostureLabel({ record, extraction }),
+          detail: 'The first impression should concentrate the strongest typography, imagery, and palette signal.',
+          signals: uniqueStrings([
+            extraction.interestingRegions[0]?.title || null,
+            extraction.typography.hierarchy[0]?.use || null,
+            extraction.colors.gradientNotes[0] || null,
+          ]),
+          sourcePointers: buildSourcePointers({ record, extraction, signals: [extraction.interestingRegions[0]?.title] }),
+          sourceRecordIds: record?.id ? [record.id] : [],
+        }),
+      ].filter(Boolean),
+      proofStyle: [
+        buildIngredientItem({
+          family: 'pageMaking.proofStyle',
+          label: buildProofStyleLabel({ record, extraction }),
+          detail: 'Proof should feel traceable to a real artifact rather than a decorative filler panel.',
+          signals: uniqueStrings([
+            extraction.components[0]?.name || null,
+            extraction.imageryIllustration.styles[0] || null,
+            record?.sourceType === 'local-image' ? 'Physical artifact display' : 'Product screenshot evidence',
+          ]),
+          sourcePointers: buildSourcePointers({ record, extraction, signals: extraction.components.map((component) => component.name) }),
+          sourceRecordIds: record?.id ? [record.id] : [],
+        }),
+      ].filter(Boolean),
+      ctaTone: [
+        buildIngredientItem({
+          family: 'pageMaking.ctaTone',
+          label: buildCtaToneLabel(extraction, record),
+          detail: 'Action language should match the confidence and contrast level of the underlying visual system.',
+          signals: uniqueStrings([
+            extraction.colors.brandTokens[0]?.role || null,
+            extraction.typography.principles[0] || null,
+            extraction.dos[0] || null,
+          ]),
+          sourcePointers: buildSourcePointers({ record, extraction, signals: extraction.dos }),
+          sourceRecordIds: record?.id ? [record.id] : [],
+        }),
+      ].filter(Boolean),
+      sectionPacing: [
+        buildIngredientItem({
+          family: 'pageMaking.sectionPacing',
+          label: record?.sourceType === 'local-image' ? 'Clustered physical pacing' : 'Alternating proof cadence',
+          detail: extraction.layout.summary,
+          signals: uniqueStrings([
+            ...extraction.layout.spacingSystem.slice(0, 3),
+            ...extraction.layout.responsiveStrategy.slice(0, 2),
+          ]),
+          sourcePointers: buildSourcePointers({ record, extraction, signals: extraction.layout.spacingSystem }),
+          sourceRecordIds: record?.id ? [record.id] : [],
+        }),
+      ].filter(Boolean),
+      installVisibility: [
+        buildIngredientItem({
+          family: 'pageMaking.installVisibility',
+          label: record?.sourceType === 'url' ? 'Visible action anchor' : 'Earned action reveal',
+          detail: record?.sourceType === 'url'
+            ? 'Primary actions should remain easy to find without overwhelming the page story.'
+            : 'Conversion should emerge after the artifact display has established trust and realism.',
+          signals: uniqueStrings([
+            extraction.colors.brandTokens[0]?.value || null,
+            extraction.layout.spacingSystem[0] || null,
+            extraction.typography.hierarchy[0]?.use || null,
+          ]),
+          sourcePointers: buildSourcePointers({ record, extraction, signals: extraction.colors.gradientNotes }),
+          sourceRecordIds: record?.id ? [record.id] : [],
+        }),
+      ].filter(Boolean),
+      artifactDisplayStrategy: [
+        buildIngredientItem({
+          family: 'pageMaking.artifactDisplayStrategy',
+          label: record?.sourceType === 'local-image' ? 'Pinned artifact wall' : 'Structured proof modules',
+          detail: record?.sourceType === 'local-image'
+            ? 'Artifacts should keep their tactile edges, mixed materials, and slight imperfections.'
+            : 'Artifacts should look like intentional proof blocks with clear hierarchy and reusable layout logic.',
+          signals: uniqueStrings([
+            ...(extraction.interestingRegions || []).map((region) => region.title),
+            ...imagerySignals.slice(0, 2),
+            ...materials.slice(0, 2),
+          ]),
+          sourcePointers: buildSourcePointers({ record, extraction, signals: (extraction.interestingRegions || []).map((region) => region.title) }),
+          sourceRecordIds: record?.id ? [record.id] : [],
+        }),
+      ].filter(Boolean),
+    },
+  };
+}
+
+function hasAnyIngredientItems(layer) {
+  return flattenIngredientLayer(layer).length > 0;
 }
 
 export async function writeReferenceDesignArtifacts({
@@ -332,19 +760,42 @@ export async function writeReferenceDesignArtifacts({
     recordId: record.id,
   });
 
+  const hydratedExtraction = hydrateReferenceDesignExtraction({
+    record,
+    extraction,
+  });
+  const explainArtifact = buildReferenceExplainArtifact({
+    record,
+    extraction: hydratedExtraction,
+  });
+
   await fs.mkdir(paths.designRoot, { recursive: true });
   await fs.writeFile(
     paths.designSystemJsonPath,
-    `${JSON.stringify(extraction, null, 2)}\n`,
+    `${JSON.stringify(hydratedExtraction, null, 2)}\n`,
     'utf8'
   );
   await fs.writeFile(
     paths.designMdPath,
-    `${renderReferenceDesignMarkdown({ record, extraction })}\n`,
+    `${renderReferenceDesignMarkdown({ record, extraction: hydratedExtraction })}\n`,
+    'utf8'
+  );
+  await fs.writeFile(
+    paths.explainJsonPath,
+    `${JSON.stringify(explainArtifact, null, 2)}\n`,
+    'utf8'
+  );
+  await fs.writeFile(
+    paths.explainMdPath,
+    `${renderReferenceExplainMarkdown(explainArtifact)}\n`,
     'utf8'
   );
 
-  return paths;
+  return {
+    ...paths,
+    extraction: hydratedExtraction,
+    explainArtifact,
+  };
 }
 
 export async function readReferenceDesignExtraction(record) {
@@ -404,7 +855,10 @@ export async function loadCompleteDesignReferences({ records, libraryRoot }) {
 
     references.push({
       record: hydratedRecord,
-      extraction,
+      extraction: hydrateReferenceDesignExtraction({
+        record: hydratedRecord,
+        extraction,
+      }),
     });
   }
 
@@ -431,6 +885,7 @@ export async function synthesizeLibraryDesignSystem({
     ...inferDesignTensions(extractions),
   ]).slice(0, 6);
   const sourceRecordIds = extractions.map(({ record }) => record.id);
+  const ingredientLayer = buildAggregatedIngredientLayer(extractions);
 
   return {
     generatedAt: new Date().toISOString(),
@@ -441,6 +896,7 @@ export async function synthesizeLibraryDesignSystem({
       stablePatterns,
       tensions,
     }),
+    ingredients: ingredientLayer,
     stablePatterns,
     antiPatterns,
     tensions,
@@ -597,6 +1053,10 @@ export function renderReferenceDesignMarkdown({ record, extraction }) {
     ...renderSubBulletList('Patterns', extraction.motionInteraction.patterns),
     ...renderSubBulletList('Notes', extraction.motionInteraction.notes),
     '',
+    '## Ingredients',
+    '',
+    ...renderIngredientLayerMarkdown(extraction.ingredients),
+    '',
     "## Do's",
     '',
     ...renderBulletList(extraction.dos),
@@ -640,6 +1100,10 @@ export function renderLibraryDesignMarkdown(synthesis) {
     '## Branch Directions',
     '',
     ...renderBranchDirections(synthesis.branchDirections),
+    '',
+    '## Ingredients',
+    '',
+    ...renderIngredientLayerMarkdown(synthesis.ingredients),
     '',
     '## Colors',
     '',
@@ -1062,12 +1526,266 @@ function renderBranchDirections(branches) {
   return lines;
 }
 
+function renderIngredientLayerMarkdown(layer) {
+  const normalized = normalizeIngredientLayer(layer);
+  const lines = [];
+
+  lines.push('### Visual Ingredients', '');
+  lines.push(...renderIngredientFamily('Typography', normalized.visual.typography));
+  lines.push(...renderIngredientFamily('Palette', normalized.visual.palette));
+  lines.push(...renderIngredientFamily('Layout Rhythm', normalized.visual.layoutRhythm));
+  lines.push(...renderIngredientFamily('Imagery Mode', normalized.visual.imageryMode));
+  lines.push(...renderIngredientFamily('Materiality', normalized.visual.materiality));
+  lines.push(...renderIngredientFamily('Realism', normalized.visual.realism));
+  lines.push(...renderIngredientFamily('Mood', normalized.visual.mood));
+  lines.push(...renderIngredientFamily('Anti-Patterns', normalized.visual.antiPatterns));
+  lines.push('### Page-Making Ingredients', '');
+  lines.push(...renderIngredientFamily('Hero Posture', normalized.pageMaking.heroPosture));
+  lines.push(...renderIngredientFamily('Proof Style', normalized.pageMaking.proofStyle));
+  lines.push(...renderIngredientFamily('CTA Tone', normalized.pageMaking.ctaTone));
+  lines.push(...renderIngredientFamily('Section Pacing', normalized.pageMaking.sectionPacing));
+  lines.push(...renderIngredientFamily('Install Visibility', normalized.pageMaking.installVisibility));
+  lines.push(...renderIngredientFamily('Artifact Display Strategy', normalized.pageMaking.artifactDisplayStrategy));
+
+  return lines;
+}
+
+function renderIngredientFamily(title, items) {
+  const lines = [`#### ${title}`, ''];
+  if (!Array.isArray(items) || items.length === 0) {
+    lines.push('- None recorded yet.', '');
+    return lines;
+  }
+
+  for (const item of items) {
+    lines.push(`- **${item.label}**${item.detail ? `: ${item.detail}` : ''}`);
+    if (item.signals.length > 0) {
+      lines.push(`Signals: ${item.signals.join(', ')}`);
+    }
+    if (item.sourcePointers.length > 0) {
+      lines.push(`Pointers: ${item.sourcePointers.map((pointer) => `${pointer.kind}=${pointer.value}${pointer.note ? ` (${pointer.note})` : ''}`).join(' · ')}`);
+    }
+  }
+  lines.push('');
+  return lines;
+}
+
+function buildReferenceExplainArtifact({ record, extraction }) {
+  return {
+    generatedAt: new Date().toISOString(),
+    level: 'reference',
+    recordId: record.id,
+    sourceUrl: record.sourceUrl || null,
+    sourcePath: record.sourcePath || null,
+    overview: `This explain artifact shows how one saved reference contributes reusable taste ingredients and page-making cues.`,
+    ingredients: extraction.ingredients,
+    interestingRegions: extraction.interestingRegions,
+    sourceEvidence: uniqueStrings([
+      record.userNote || null,
+      record.sourceUrl || null,
+      ...extraction.sourceEvidence,
+    ]),
+  };
+}
+
+function renderReferenceExplainMarkdown(explain) {
+  const lines = [
+    '# Reference Explain',
+    '',
+    explain.overview,
+    '',
+    '## Ingredients',
+    '',
+    ...renderIngredientLayerMarkdown(explain.ingredients),
+    '## Interesting Regions',
+    '',
+    ...renderInterestingRegions(explain.interestingRegions),
+    '',
+    '## Source Evidence',
+    '',
+    ...renderBulletList(explain.sourceEvidence),
+  ];
+
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd();
+}
+
 function buildFallbackTokens(values, labelPrefix) {
   return normalizeStringArray(values).slice(0, 3).map((value, index) => ({
     name: `${labelPrefix} ${index + 1}`,
     value: value,
     role: 'Observed visual cue',
   }));
+}
+
+function buildAggregatedIngredientLayer(extractions) {
+  const empty = buildEmptyIngredientLayer();
+  const visualFamilies = Object.keys(empty.visual);
+  const pageFamilies = Object.keys(empty.pageMaking);
+
+  return {
+    visual: Object.fromEntries(visualFamilies.map((family) => [
+      family,
+      aggregateIngredientFamily(extractions, `visual.${family}`),
+    ])),
+    pageMaking: Object.fromEntries(pageFamilies.map((family) => [
+      family,
+      aggregateIngredientFamily(extractions, `pageMaking.${family}`),
+    ])),
+  };
+}
+
+function aggregateIngredientFamily(extractions, familyPath) {
+  const items = [];
+  for (const { extraction, record } of extractions) {
+    const familyItems = resolveIngredientFamilyItems(extraction.ingredients, familyPath);
+    for (const item of familyItems) {
+      items.push({
+        ...item,
+        sourceRecordIds: uniqueStrings([
+          ...(item.sourceRecordIds || []),
+          record.id,
+        ]),
+      });
+    }
+  }
+
+  const grouped = new Map();
+  for (const item of items) {
+    const existing = grouped.get(item.id);
+    if (!existing) {
+      grouped.set(item.id, {
+        ...item,
+        count: item.count || 1,
+      });
+      continue;
+    }
+
+    existing.count += 1;
+    existing.sourceRecordIds = uniqueStrings([
+      ...existing.sourceRecordIds,
+      ...item.sourceRecordIds,
+    ]);
+    existing.signals = uniqueStrings([
+      ...existing.signals,
+      ...item.signals,
+    ]).slice(0, 8);
+    existing.sourcePointers = dedupePointers([
+      ...existing.sourcePointers,
+      ...item.sourcePointers,
+    ]).slice(0, 8);
+  }
+
+  return Array.from(grouped.values())
+    .sort((left, right) => {
+      if ((right.count || 0) !== (left.count || 0)) {
+        return (right.count || 0) - (left.count || 0);
+      }
+      return left.label.localeCompare(right.label);
+    })
+    .slice(0, 8);
+}
+
+function resolveIngredientFamilyItems(layer, familyPath) {
+  const [scope, family] = familyPath.split('.');
+  if (!layer || typeof layer !== 'object') {
+    return [];
+  }
+  return Array.isArray(layer?.[scope]?.[family]) ? layer[scope][family] : [];
+}
+
+function flattenIngredientLayer(layer) {
+  const normalized = normalizeIngredientLayer(layer);
+  return [
+    ...Object.values(normalized.visual).flat(),
+    ...Object.values(normalized.pageMaking).flat(),
+  ];
+}
+
+function buildRealismSignals({ record, extraction, materials, imagerySignals }) {
+  const sourceBlob = [
+    record?.userNote || '',
+    record?.sourceUrl || '',
+    ...extraction.sourceEvidence,
+    ...materials,
+    ...imagerySignals,
+  ].join(' ').toLowerCase();
+
+  const physicalHit = ['clothespin', 'paper', 'mesh', 'lighting', 'physical', 'tactile', 'packaging', 'ephemera'].some((term) => sourceBlob.includes(term));
+  const screenHit = ['screenshot', 'ui', 'hero', 'product', 'screen'].some((term) => sourceBlob.includes(term));
+
+  if (physicalHit) {
+    return {
+      label: 'Physical realism',
+      detail: 'The reference feels grounded in real materials, lighting, and imperfect physical arrangement.',
+      signals: uniqueStrings([
+        ...materials.slice(0, 4),
+        ...imagerySignals.slice(0, 2),
+        'Real-world lighting',
+        'Material honesty',
+      ]),
+    };
+  }
+
+  if (screenHit) {
+    return {
+      label: 'Product-proof realism',
+      detail: 'The reference keeps realism through interface proof, concrete screenshots, or system evidence rather than abstract spectacle.',
+      signals: uniqueStrings([
+        ...imagerySignals.slice(0, 4),
+        ...extraction.interestingRegions.map((region) => region.title).slice(0, 2),
+      ]),
+    };
+  }
+
+  return {
+    label: 'Curated realism',
+    detail: 'The reference balances curation and believability without feeling synthetic or over-smoothed.',
+    signals: uniqueStrings([
+      ...imagerySignals.slice(0, 3),
+      ...materials.slice(0, 3),
+    ]),
+  };
+}
+
+function buildMaterialityLabel(materials) {
+  const blob = materials.join(' ').toLowerCase();
+  if (blob.includes('paper') || blob.includes('clothespin') || blob.includes('mesh')) {
+    return 'Tactile material stack';
+  }
+  if (blob.includes('gradient') || blob.includes('shadow') || blob.includes('digital')) {
+    return 'Digital material finish';
+  }
+  return materials[0] || 'Material signature';
+}
+
+function buildHeroPostureLabel({ record, extraction }) {
+  if (record?.sourceType === 'local-image' && extraction.interestingRegions.some((region) => /poster|grid|wall/i.test(region.title))) {
+    return 'Physical focal wall';
+  }
+  if (extraction.colors.gradientNotes.length > 0) {
+    return 'Atmospheric hero field';
+  }
+  return 'System-forward hero posture';
+}
+
+function buildProofStyleLabel({ record, extraction }) {
+  if (record?.sourceType === 'local-image') {
+    return 'Found artifact proof';
+  }
+  if (extraction.components.some((component) => /card|table|mockup|screenshot/i.test(component.name))) {
+    return 'Structured product proof';
+  }
+  return 'Curated modular proof';
+}
+
+function buildCtaToneLabel(extraction, record) {
+  if (record?.sourceType === 'local-image') {
+    return 'Earned and understated CTA tone';
+  }
+  if (extraction.colors.brandTokens.length > 0) {
+    return 'High-contrast decisive CTA tone';
+  }
+  return 'Clear but restrained CTA tone';
 }
 
 function collectStablePatterns(extractions, tasteSummary) {
