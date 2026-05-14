@@ -7,14 +7,21 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
+  captureTaste,
+  extractDesignSystem,
   saveInspirationToMoodboard,
   saveWebsiteToMoodboard,
 } from './capture-core.js';
+import { summarizeTaste } from './taste-summary.js';
+import {
+  generateTasteVisuals,
+  visualizeTaste,
+} from './taste-visuals.js';
 
 const server = new Server(
   {
     name: 'moodboard-capture',
-    version: '0.3.0',
+    version: '0.4.0',
   },
   {
     capabilities: {
@@ -23,10 +30,19 @@ const server = new Server(
   }
 );
 
-const sharedProperties = {
+const facetSchema = {
+  type: 'array',
+  items: {
+    type: 'string',
+    enum: ['colors', 'typography', 'layout', 'components', 'imagery', 'motion', 'dos-donts'],
+  },
+  description: 'Optional facet focus list for design-system extraction.',
+};
+
+const captureProperties = {
   destinationPath: {
     type: 'string',
-    description: 'Optional absolute or workspace-relative folder path override.',
+    description: 'Optional absolute or workspace-relative library root override.',
   },
   tags: {
     type: 'array',
@@ -44,20 +60,21 @@ const sharedProperties = {
     items: {
       type: 'string',
     },
-      description: 'Optional design direction cues such as muted palette or oversized serif.',
-    },
+    description: 'Optional design direction cues such as muted palette or oversized serif.',
+  },
   userNote: {
     type: 'string',
     description: 'Optional short human note describing what stands out or why the reference matters.',
   },
+  facets: facetSchema,
 };
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
-        name: 'save_inspiration_to_moodboard',
-        description: 'Save either a website screenshot or a local image into the moodboard library, then build taste-memory signals when analysis is available.',
+        name: 'capture_taste',
+        description: 'Capture a website or local image into the taste library, analyze it, generate per-reference design docs, and update the active taste profile.',
         inputSchema: {
           type: 'object',
           additionalProperties: false,
@@ -70,13 +87,81 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'string',
               description: 'Absolute or current-working-directory-relative path to a local image to import.',
             },
-            ...sharedProperties,
+            ...captureProperties,
           },
         },
       },
       {
-        name: 'save_website_to_moodboard',
-        description: 'Compatibility alias for saving a website screenshot into the moodboard library with taste-memory analysis.',
+        name: 'extract_design_system',
+        description: 'Re-run or refine design-system extraction for an existing saved record and regenerate design-system.json plus design.md.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            recordId: {
+              type: 'string',
+              description: 'The saved moodboard record id to extract against.',
+            },
+            destinationPath: {
+              type: 'string',
+              description: 'Optional absolute or workspace-relative library root override.',
+            },
+            facets: facetSchema,
+            force: {
+              type: 'boolean',
+              description: 'When true, regenerate extraction artifacts even if matching artifacts already exist.',
+            },
+          },
+          required: ['recordId'],
+        },
+      },
+      {
+        name: 'summarize_taste',
+        description: 'Summarize the active taste library into stable preferences, anti-patterns, tensions, branch directions, and a library-level design system.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            destinationPath: {
+              type: 'string',
+              description: 'Optional absolute or workspace-relative library root override.',
+            },
+            profilePath: {
+              type: 'string',
+              description: 'Optional explicit path to a taste-profile.json file.',
+            },
+          },
+        },
+      },
+      {
+        name: 'visualize_taste',
+        description: 'Generate visual moodboards from the active taste summary and library design-system synthesis in one or more named directions.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            destinationPath: {
+              type: 'string',
+              description: 'Optional absolute or workspace-relative library root override.',
+            },
+            summaryPath: {
+              type: 'string',
+              description: 'Optional explicit path to a taste-summary.json file.',
+            },
+            directions: {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: ['infra-editorial', 'warm-technical', 'strange-systems'],
+              },
+              description: 'Optional list of visual directions to render. Defaults to all three.',
+            },
+          },
+        },
+      },
+      {
+        name: 'save_inspiration_to_moodboard',
+        description: 'Compatibility alias for capture_taste.',
         inputSchema: {
           type: 'object',
           additionalProperties: false,
@@ -85,9 +170,58 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'string',
               description: 'The http, https, or file URL to capture as a full-page screenshot.',
             },
-            ...sharedProperties,
+            localImagePath: {
+              type: 'string',
+              description: 'Absolute or current-working-directory-relative path to a local image to import.',
+            },
+            ...captureProperties,
+          },
+        },
+      },
+      {
+        name: 'save_website_to_moodboard',
+        description: 'Compatibility alias for website-only capture.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            url: {
+              type: 'string',
+              description: 'The http, https, or file URL to capture as a full-page screenshot.',
+            },
+            ...captureProperties,
           },
           required: ['url'],
+        },
+      },
+      {
+        name: 'generate_taste_visuals',
+        description: 'Compatibility alias for visualize_taste.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            destinationPath: {
+              type: 'string',
+              description: 'Optional absolute or workspace-relative library root override.',
+            },
+            summaryPath: {
+              type: 'string',
+              description: 'Optional explicit path to a taste-summary.json file.',
+            },
+            profilePath: {
+              type: 'string',
+              description: 'Optional explicit path to a taste-profile.json file for compatibility.',
+            },
+            directions: {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: ['infra-editorial', 'warm-technical', 'strange-systems'],
+              },
+              description: 'Optional list of visual directions to render. Defaults to all three.',
+            },
+          },
         },
       },
     ],
@@ -100,7 +234,36 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     let result;
 
-    if (name === 'save_inspiration_to_moodboard') {
+    if (name === 'capture_taste') {
+      result = await captureTaste({
+        url: args.url,
+        localImagePath: args.localImagePath,
+        destinationPath: args.destinationPath,
+        tags: args.tags,
+        whyLiked: args.whyLiked,
+        styleCues: args.styleCues,
+        userNote: args.userNote,
+        facets: args.facets,
+      });
+    } else if (name === 'extract_design_system') {
+      result = await extractDesignSystem({
+        recordId: args.recordId,
+        destinationPath: args.destinationPath,
+        facets: args.facets,
+        force: args.force,
+      });
+    } else if (name === 'summarize_taste') {
+      result = await summarizeTaste({
+        destinationPath: args.destinationPath,
+        profilePath: args.profilePath,
+      });
+    } else if (name === 'visualize_taste') {
+      result = await visualizeTaste({
+        destinationPath: args.destinationPath,
+        summaryPath: args.summaryPath,
+        directions: args.directions,
+      });
+    } else if (name === 'save_inspiration_to_moodboard') {
       result = await saveInspirationToMoodboard({
         url: args.url,
         localImagePath: args.localImagePath,
@@ -109,6 +272,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         whyLiked: args.whyLiked,
         styleCues: args.styleCues,
         userNote: args.userNote,
+        facets: args.facets,
       });
     } else if (name === 'save_website_to_moodboard') {
       result = await saveWebsiteToMoodboard({
@@ -118,6 +282,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         whyLiked: args.whyLiked,
         styleCues: args.styleCues,
         userNote: args.userNote,
+        facets: args.facets,
+      });
+    } else if (name === 'generate_taste_visuals') {
+      result = await generateTasteVisuals({
+        destinationPath: args.destinationPath,
+        summaryPath: args.summaryPath,
+        profilePath: args.profilePath,
+        directions: args.directions,
       });
     } else {
       throw new Error(`Unknown tool: ${name}`);
@@ -133,19 +305,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   } catch (error) {
     return {
-      isError: true,
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              error: error.message,
-            },
-            null,
-            2
-          ),
+          text: JSON.stringify({
+            error: error.message,
+          }, null, 2),
         },
       ],
+      isError: true,
     };
   }
 });

@@ -7,7 +7,17 @@ import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 import { chromium } from 'playwright';
 import { analyzeCaptureTaste } from './taste-analysis.js';
-import { updateTasteProfiles } from './taste-profile.js';
+import {
+  getReferenceDesignPaths,
+  normalizeDesignFacets,
+  writeReferenceDesignArtifacts,
+} from './design-system.js';
+import { collectPageInsights } from './page-insights.js';
+import {
+  readLibraryRecords,
+  updateTasteProfiles,
+  writeLibraryRecords,
+} from './taste-profile.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,9 +60,16 @@ const desktopViewport = {
  * @property {Object|null} profileContributions
  * @property {Object|null} tasteAnalysis
  * @property {string|null} analysisError
+ * @property {'complete'|'failed'|'pending'} designExtractionStatus
+ * @property {string|null} designSystemJsonPath
+ * @property {string|null} designMdPath
+ * @property {string[]} designFacets
+ * @property {Object[]} interestingRegions
+ * @property {string|null} designExtractionError
+ * @property {Object|null} pageInsights
  */
 
-export async function saveInspirationToMoodboard({
+export async function captureTaste({
   url,
   localImagePath,
   destinationPath,
@@ -61,6 +78,7 @@ export async function saveInspirationToMoodboard({
   whyLiked,
   styleCues,
   userNote,
+  facets,
 }) {
   const source = await resolveSourceInput({ url, localImagePath });
   const rootHint = resolveWorkspaceHint(workspaceRoot);
@@ -68,6 +86,7 @@ export async function saveInspirationToMoodboard({
     destinationPath,
     workspaceRoot: rootHint,
   });
+  const normalizedFacets = normalizeDesignFacets(facets);
 
   const libraryRoot = destination.resolvedPath;
   const assetsPath = path.join(libraryRoot, assetsDirectoryName);
@@ -79,8 +98,9 @@ export async function saveInspirationToMoodboard({
 
   await fs.mkdir(assetsPath, { recursive: true });
 
+  let pageInsights = null;
   if (source.type === 'url') {
-    await capturePage(source.normalizedUrl, savedAssetPath);
+    pageInsights = await capturePage(source.normalizedUrl, savedAssetPath);
   } else {
     await copyLocalImage(source.absolutePath, savedAssetPath);
   }
@@ -91,10 +111,11 @@ export async function saveInspirationToMoodboard({
     assetFilename,
     timestamp,
     metadata,
+    facets: normalizedFacets,
+    pageInsights,
   });
 
   const globalProfileRoot = await resolveGlobalProfileRoot({
-    workspaceRoot: rootHint,
     localLibraryRoot: libraryRoot,
   });
 
@@ -107,7 +128,7 @@ export async function saveInspirationToMoodboard({
   let profileUpdateError = null;
 
   try {
-    const tasteAnalysis = await analyzeCaptureTaste({
+    const analysisResult = await analyzeCaptureTaste({
       assetPath: savedAssetPath,
       sourceType: source.type,
       sourceUrl: source.type === 'url' ? source.normalizedUrl : null,
@@ -115,10 +136,27 @@ export async function saveInspirationToMoodboard({
       tags: metadata.tags,
       whyLiked: metadata.whyLiked,
       styleCues: metadata.styleCues,
+      facets: normalizedFacets,
+      observedEvidence: record.pageInsights,
     });
 
-    if (tasteAnalysis) {
-      applyTasteAnalysis(record, tasteAnalysis);
+    if (analysisResult) {
+      applyTasteAnalysis(record, analysisResult.tasteAnalysis);
+
+      try {
+        const designPaths = await writeReferenceDesignArtifacts({
+          libraryRoot,
+          record,
+          extraction: analysisResult.designSystemExtraction,
+        });
+        applyDesignExtraction(record, {
+          extraction: analysisResult.designSystemExtraction,
+          designPaths,
+        });
+      } catch (error) {
+        record.designExtractionStatus = 'failed';
+        record.designExtractionError = error.message;
+      }
 
       try {
         const profileUpdate = await updateTasteProfiles({
@@ -143,28 +181,32 @@ export async function saveInspirationToMoodboard({
       }
     } else {
       record.analysisStatus = 'pending';
+      record.designExtractionStatus = 'pending';
     }
   } catch (error) {
     record.analysisStatus = 'failed';
     record.analysisError = error.message;
+    record.designExtractionStatus = 'failed';
+    record.designExtractionError = error.message;
   }
 
   await appendIndexEntry(indexPath, record);
 
-  return {
-    recordId: record.id,
+  return buildCaptureResponse({
+    record,
     savedAssetPath,
     indexPath,
     resolvedDestination: libraryRoot,
     warning: destination.warning,
-    analysisStatus: record.analysisStatus,
-    tasteAnalysis: record.tasteAnalysis,
     localProfilePath,
     globalProfilePath,
     profileUpdateStatus,
     profileUpdateError,
-    record,
-  };
+  });
+}
+
+export async function saveInspirationToMoodboard(args) {
+  return captureTaste(args);
 }
 
 export async function saveWebsiteToMoodboard({
@@ -175,8 +217,9 @@ export async function saveWebsiteToMoodboard({
   whyLiked,
   styleCues,
   userNote,
+  facets,
 }) {
-  const result = await saveInspirationToMoodboard({
+  const result = await captureTaste({
     url,
     destinationPath,
     workspaceRoot,
@@ -184,12 +227,119 @@ export async function saveWebsiteToMoodboard({
     whyLiked,
     styleCues,
     userNote,
+    facets,
   });
 
   return {
     ...result,
     savedImagePath: result.savedAssetPath,
     url: result.record.sourceUrl,
+  };
+}
+
+export async function extractDesignSystem({
+  recordId,
+  destinationPath,
+  workspaceRoot,
+  facets,
+  force,
+}) {
+  if (!recordId || typeof recordId !== 'string') {
+    throw new Error('A non-empty recordId is required.');
+  }
+
+  const rootHint = resolveWorkspaceHint(workspaceRoot);
+  const destination = await resolveDestination({
+    destinationPath,
+    workspaceRoot: rootHint,
+  });
+  const libraryRoot = destination.resolvedPath;
+  const indexPath = path.join(libraryRoot, libraryIndexFilename);
+  const records = await readLibraryRecords(indexPath);
+  const recordIndex = records.findIndex((item) => item?.id === recordId);
+
+  if (recordIndex === -1) {
+    throw new Error(`Record not found: ${recordId}`);
+  }
+
+  const record = records[recordIndex];
+  const normalizedFacets = normalizeDesignFacets(facets || record.designFacets);
+  const designPaths = getReferenceDesignPaths({
+    libraryRoot,
+    recordId,
+  });
+
+  if (
+    !force &&
+    record.designExtractionStatus === 'complete' &&
+    sameStringSet(record.designFacets, normalizedFacets) &&
+    await fileExists(record.designSystemJsonPath || designPaths.designSystemJsonPath) &&
+    await fileExists(record.designMdPath || designPaths.designMdPath)
+  ) {
+    return {
+      recordId,
+      libraryRoot,
+      designSystemJsonPath: record.designSystemJsonPath || designPaths.designSystemJsonPath,
+      designMdPath: record.designMdPath || designPaths.designMdPath,
+      facets: normalizedFacets,
+      status: 'complete',
+      interestingRegions: Array.isArray(record.interestingRegions) ? record.interestingRegions : [],
+      warning: destination.warning,
+    };
+  }
+
+  const assetPath = path.join(libraryRoot, assetsDirectoryName, record.assetFilename);
+  if (!await fileExists(assetPath)) {
+    throw new Error(`Saved asset not found for record ${recordId}: ${assetPath}`);
+  }
+
+  try {
+    const analysisResult = await analyzeCaptureTaste({
+      assetPath,
+      sourceType: record.sourceType,
+      sourceUrl: record.sourceUrl,
+      userNote: record.userNote,
+      tags: record.tags,
+      whyLiked: record.whyLiked,
+      styleCues: record.styleCues,
+      facets: normalizedFacets,
+      observedEvidence: record.pageInsights,
+    });
+
+    if (!analysisResult) {
+      record.designExtractionStatus = 'pending';
+      record.designFacets = normalizedFacets;
+      record.designExtractionError = null;
+    } else {
+      const writtenPaths = await writeReferenceDesignArtifacts({
+        libraryRoot,
+        record,
+        extraction: analysisResult.designSystemExtraction,
+      });
+      applyDesignExtraction(record, {
+        extraction: analysisResult.designSystemExtraction,
+        designPaths: writtenPaths,
+      });
+    }
+  } catch (error) {
+    record.designExtractionStatus = 'failed';
+    record.designFacets = normalizedFacets;
+    record.designExtractionError = error.message;
+  }
+
+  records[recordIndex] = record;
+  await writeLibraryRecords(indexPath, records);
+
+  return {
+    recordId,
+    libraryRoot,
+    designSystemJsonPath: record.designSystemJsonPath,
+    designMdPath: record.designMdPath,
+    facets: record.designFacets,
+    status: record.designExtractionStatus,
+    interestingRegions: record.interestingRegions,
+    error: record.designExtractionError,
+    warning: destination.warning,
   };
 }
 
@@ -305,6 +455,8 @@ function buildBaseLibraryRecord({
   assetFilename,
   timestamp,
   metadata,
+  facets,
+  pageInsights,
 }) {
   /** @type {MoodboardRecord} */
   const record = {
@@ -326,6 +478,13 @@ function buildBaseLibraryRecord({
     profileContributions: null,
     tasteAnalysis: null,
     analysisError: null,
+    designExtractionStatus: 'pending',
+    designSystemJsonPath: null,
+    designMdPath: null,
+    designFacets: facets,
+    interestingRegions: [],
+    designExtractionError: null,
+    pageInsights: pageInsights || null,
   };
 
   return record;
@@ -339,6 +498,48 @@ function applyTasteAnalysis(record, tasteAnalysis) {
   record.profileContributions = tasteAnalysis.profileContributions;
   record.tasteAnalysis = tasteAnalysis;
   record.analysisError = null;
+}
+
+function applyDesignExtraction(record, { extraction, designPaths }) {
+  record.designExtractionStatus = 'complete';
+  record.designSystemJsonPath = designPaths.designSystemJsonPath;
+  record.designMdPath = designPaths.designMdPath;
+  record.designFacets = Array.isArray(extraction.facets) ? extraction.facets : record.designFacets;
+  record.interestingRegions = Array.isArray(extraction.interestingRegions) ? extraction.interestingRegions : [];
+  record.designExtractionError = null;
+}
+
+function buildCaptureResponse({
+  record,
+  savedAssetPath,
+  indexPath,
+  resolvedDestination,
+  warning,
+  localProfilePath,
+  globalProfilePath,
+  profileUpdateStatus,
+  profileUpdateError,
+}) {
+  return {
+    recordId: record.id,
+    savedAssetPath,
+    indexPath,
+    resolvedDestination,
+    warning,
+    analysisStatus: record.analysisStatus,
+    tasteAnalysis: record.tasteAnalysis,
+    localProfilePath,
+    globalProfilePath,
+    profileUpdateStatus,
+    profileUpdateError,
+    designExtractionStatus: record.designExtractionStatus,
+    designSystemJsonPath: record.designSystemJsonPath,
+    designMdPath: record.designMdPath,
+    designFacets: record.designFacets,
+    interestingRegions: record.interestingRegions,
+    designExtractionError: record.designExtractionError,
+    record,
+  };
 }
 
 export function resolveWorkspaceHint(explicitWorkspaceRoot) {
@@ -372,129 +573,14 @@ async function resolveDestination({ destinationPath, workspaceRoot }) {
     };
   }
 
-  if (workspaceRoot) {
-    const conventional = await resolveConventionalMoodboard(workspaceRoot);
-    if (conventional) {
-      return {
-        resolvedPath: conventional,
-        warning: null,
-      };
-    }
-
-    const discovered = await findMoodboardDirectory(workspaceRoot);
-    if (discovered) {
-      return {
-        resolvedPath: discovered,
-        warning: 'Used the first discovered moodboard directory in the current workspace.',
-      };
-    }
-  }
-
   return {
     resolvedPath: globalFallback,
-    warning: 'No workspace moodboard directory was found, so the global fallback folder was used.',
+    warning: 'Used the default moodboard inbox because no explicit destinationPath was provided.',
   };
 }
 
-async function resolveGlobalProfileRoot({ workspaceRoot, localLibraryRoot }) {
-  if (workspaceRoot) {
-    const conventional = await resolveConventionalMoodboard(workspaceRoot);
-    if (conventional) {
-      return conventional;
-    }
-
-    const discovered = await findMoodboardDirectory(workspaceRoot);
-    if (discovered) {
-      return discovered;
-    }
-  }
-
+async function resolveGlobalProfileRoot({ localLibraryRoot }) {
   return localLibraryRoot;
-}
-
-async function resolveConventionalMoodboard(workspaceRoot) {
-  const bases = await existingAncestorChain(workspaceRoot);
-  for (const base of bases) {
-    const candidates = [
-      path.join(base, 'Knowledge', 'Design', 'moodboard-assets'),
-      path.join(base, 'Design', 'moodboard-assets'),
-    ];
-
-    for (const candidate of candidates) {
-      if (await isDirectory(candidate)) {
-        return candidate;
-      }
-    }
-  }
-
-  return null;
-}
-
-async function existingAncestorChain(startPath) {
-  const chain = [];
-  let current = path.resolve(startPath);
-
-  while (true) {
-    chain.push(current);
-    const parent = path.dirname(current);
-    if (parent === current) {
-      break;
-    }
-    current = parent;
-  }
-
-  return chain;
-}
-
-async function findMoodboardDirectory(workspaceRoot) {
-  const startPath = path.resolve(workspaceRoot);
-  const queue = [{ dir: startPath, depth: 0 }];
-  const seen = new Set();
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (!current || seen.has(current.dir)) {
-      continue;
-    }
-    seen.add(current.dir);
-
-    let entries;
-    try {
-      entries = await fs.readdir(current.dir, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-
-    for (const entry of entries) {
-      if (!entry.isDirectory()) {
-        continue;
-      }
-
-      if (entry.name.startsWith('.')) {
-        continue;
-      }
-
-      const fullPath = path.join(current.dir, entry.name);
-      if (entry.name.toLowerCase().includes('moodboard')) {
-        return fullPath;
-      }
-
-      if (current.depth < 4) {
-        queue.push({ dir: fullPath, depth: current.depth + 1 });
-      }
-    }
-  }
-
-  return null;
-}
-
-async function isDirectory(targetPath) {
-  try {
-    const stat = await fs.stat(targetPath);
-    return stat.isDirectory();
-  } catch {
-    return false;
-  }
 }
 
 async function capturePage(url, outputPath) {
@@ -514,12 +600,14 @@ async function capturePage(url, outputPath) {
       timeout: 30000,
     });
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    const pageInsights = await collectPageInsights(page).catch(() => null);
     await page.screenshot({
       path: outputPath,
       fullPage: true,
       type: 'png',
     });
     await context.close();
+    return pageInsights;
   } catch (error) {
     throw new Error(`Failed to capture screenshot: ${error.message}`);
   } finally {
@@ -580,4 +668,25 @@ function formatTimestamp(date) {
     pad(date.getMonth() + 1),
     pad(date.getDate()),
   ].join('-') + `_${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
+}
+
+async function fileExists(filePath) {
+  if (!filePath) {
+    return false;
+  }
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function sameStringSet(left, right) {
+  const leftValues = Array.isArray(left) ? [...left].sort() : [];
+  const rightValues = Array.isArray(right) ? [...right].sort() : [];
+  if (leftValues.length !== rightValues.length) {
+    return false;
+  }
+  return leftValues.every((value, index) => value === rightValues[index]);
 }

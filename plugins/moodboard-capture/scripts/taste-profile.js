@@ -137,7 +137,7 @@ export function buildTasteProfile({ scope, records }) {
   return profile;
 }
 
-async function readLibraryRecords(indexPath) {
+export async function readLibraryRecords(indexPath) {
   let raw;
   try {
     raw = await fs.readFile(indexPath, 'utf8');
@@ -160,6 +160,32 @@ async function readLibraryRecords(indexPath) {
       }
     })
     .filter(Boolean);
+}
+
+export async function writeLibraryRecords(indexPath, records) {
+  const normalizedRecords = Array.isArray(records) ? records : [];
+  const payload = normalizedRecords.map((record) => JSON.stringify(record)).join('\n');
+  const finalPayload = payload ? `${payload}\n` : '';
+  await fs.mkdir(path.dirname(indexPath), { recursive: true });
+  await fs.writeFile(indexPath, finalPayload, 'utf8');
+}
+
+export async function readTasteProfile(profilePath) {
+  let raw;
+  try {
+    raw = await fs.readFile(profilePath, 'utf8');
+  } catch (error) {
+    if (error && error.code === 'ENOENT') {
+      throw new Error(`Taste profile not found: ${profilePath}`);
+    }
+    throw error;
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error(`Taste profile is not valid JSON: ${profilePath}`);
+  }
 }
 
 async function findLibraryIndexes(startRoot) {

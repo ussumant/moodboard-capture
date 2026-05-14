@@ -1,7 +1,7 @@
 {
   "name": "moodboard-capture",
-  "version": "0.3.0",
-  "description": "Capture inspiration assets and build reusable taste-memory profiles in a repo moodboard folder or personal inbox.",
+  "version": "0.4.0",
+  "description": "Capture inspiration assets, build reusable taste-memory profiles, and generate design-system docs in a repo moodboard folder or personal inbox.",
   "author": {
     "name": "Moodboard Capture Contributors",
     "email": "hello@example.com",
@@ -23,8 +23,8 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Moodboard Capture",
-    "shortDescription": "Save inspiration and build taste-memory profiles for future AI-assisted design work.",
-    "longDescription": "Captures a desktop full-page screenshot for a URL or imports a local image, saves it into the best available moodboard folder, and builds per-item taste interpretation plus local and workspace-level taste profiles when analysis is available.",
+    "shortDescription": "Save inspiration, build taste-memory profiles, and generate design-system docs for future AI-assisted design work.",
+    "longDescription": "Captures a desktop full-page screenshot for a URL or imports a local image, saves it into the best available moodboard folder, and builds per-item taste interpretation, per-reference design docs, and local plus workspace-level taste profiles when analysis is available.",
     "developerName": "Local plugin",
     "category": "Productivity",
     "capabilities": [
@@ -36,8 +36,8 @@
     "termsOfServiceURL": "https://openai.com/policies/row-terms-of-use/",
     "defaultPrompt": [
       "Save https://example.com to my moodboard and explain what makes the design work.",
-      "Import /Users/me/Desktop/inspiration.png and build taste-memory signals from it.",
-      "Capture this website into the moodboard folder with a note about what stands out."
+      "Generate a design.md for that saved reference and focus on typography plus components.",
+      "Summarize my taste so far and visualize the warm-technical direction."
     ],
     "brandColor": "#111827"
   }
