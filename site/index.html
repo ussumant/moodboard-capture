@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Moodboard Capture | Open-source Codex plugin</title>
+    <meta
+      name="description"
+      content="Open-source Codex plugin for capturing references, extracting design systems, building taste memory, and generating reusable visual directions."
+    />
+    <meta name="theme-color" content="#06133a" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="site-header">
+        <a class="brand" href="#top" aria-label="Moodboard Capture home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img">
+              <circle cx="12" cy="5" r="1.4"></circle>
+              <circle cx="7.2" cy="9.2" r="1.4"></circle>
+              <circle cx="16.8" cy="9.2" r="1.4"></circle>
+              <circle cx="5.4" cy="15.5" r="1.4"></circle>
+              <circle cx="12" cy="15.5" r="1.4"></circle>
+              <circle cx="18.6" cy="15.5" r="1.4"></circle>
+              <path d="M7.8 9.4 11.1 6.2M12.9 6.2l3.3 3.2M6.8 14l-.7-3M17.9 11l-.7 3M7.8 15.5H10.6M13.4 15.5h2.8"></path>
+            </svg>
+          </span>
+          <span>Moodboard Capture</span>
+        </a>
+        <nav class="site-nav" aria-label="Primary">
+          <a href="#product">Overview</a>
+          <a href="#how-it-works">How it works</a>
+          <a href="#install">Install</a>
+          <a href="#outputs">Outputs</a>
+          <a href="#docs">Docs</a>
+        </nav>
+        <div class="header-actions">
+          <a
+            class="button button-secondary button-header-secondary"
+            href="https://github.com/ussumant/moodboard-capture"
+            target="_blank"
+            rel="noreferrer"
+          >
+            View GitHub
+          </a>
+          <a
+            class="button button-primary"
+            href="#install"
+            data-copy="codex plugin marketplace add ussumant/moodboard-capture"
+            data-copy-text="Install plugin"
+            data-copied-text="Install command copied"
+          >
+            <span class="button-copy-text">Install plugin</span>
+          </a>
+        </div>
+      </header>
+
+      <main>
+        <section class="hero-section" id="top">
+          <div class="hero-illustration" aria-hidden="true">
+            <img
+              src="./assets/generated/hero-illustration-v1.webp"
+              alt=""
+              decoding="async"
+            />
+          </div>
+          <div class="hero-copy">
+            <h1>
+              Capture references.
+              <br />
+              Extract design systems.
+              <br />
+              Keep the <em>taste.</em>
+            </h1>
+            <p>
+              <strong>Moodboard Capture</strong> is an open-source Codex plugin
+              for saving URLs or local images, writing structured artifacts to
+              disk, and turning inspiration into reusable taste memory.
+            </p>
+            <div class="hero-actions">
+              <a
+                class="button button-primary"
+                href="#install"
+                data-copy="codex plugin marketplace add ussumant/moodboard-capture"
+                data-copy-text="Install plugin"
+                data-copied-text="Install command copied"
+              >
+                <span class="button-copy-text">Install plugin</span>
+              </a>
+              <a
+                class="button button-secondary"
+                href="https://github.com/ussumant/moodboard-capture"
+                target="_blank"
+                rel="noreferrer"
+              >
+                View the repo
+                <span aria-hidden="true">↗</span>
+              </a>
+            </div>
+            <p class="hero-install-note">
+              Copies the public Codex install command for this GitHub repo, then
+              you enable <strong>Moodboard Capture</strong> in the Codex UI.
+            </p>
+          </div>
+
+          <div class="hero-visual" aria-hidden="true">
+            <div class="hero-facets">
+              <span>capture_taste</span>
+              <span>extract_design_system</span>
+              <span>summarize_taste</span>
+              <span>visualize_taste</span>
+              <span>library.jsonl</span>
+              <span>design.md</span>
+            </div>
+            <div class="hero-caption">Open source. Local first.</div>
+          </div>
+        </section>
+
+        <section class="overview-strip" id="product">
+          <div class="overview-intro">
+            <h2>Turn references into reusable design direction.</h2>
+          </div>
+          <div class="overview-grid">
+            <article class="overview-card">
+              <div class="overview-icon">⌲</div>
+              <h3>Capture URLs &amp; images</h3>
+              <p>Save full-page references or local screenshots into one library.</p>
+            </article>
+            <article class="overview-card">
+              <div class="overview-icon">◎</div>
+              <h3>Write JSON + Markdown</h3>
+              <p>Generate `library.jsonl`, `design-system.json`, and `design.md` artifacts.</p>
+            </article>
+            <article class="overview-card">
+              <div class="overview-icon">✣</div>
+              <h3>Summarize taste</h3>
+              <p>Build a reusable profile with preferences, anti-patterns, and tensions.</p>
+            </article>
+            <article class="overview-card">
+              <div class="overview-icon">↗</div>
+              <h3>Ship a static front door</h3>
+              <p>Publish the `site/` folder as the repo landing page on any static host.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="workflow-section" id="how-it-works">
+          <div class="section-heading">
+            <div class="section-kicker">How it works</div>
+            <h2>The path from one reference to a reusable brief.</h2>
+          </div>
+          <div class="step-row">
+            <div class="step-item">
+              <span>01</span>
+              <h3>capture_taste</h3>
+              <p>Save a URL or image, then append it to the active moodboard library.</p>
+            </div>
+            <div class="step-item">
+              <span>02</span>
+              <h3>extract_design_system</h3>
+              <p>Generate per-reference design readings in both JSON and Markdown.</p>
+            </div>
+            <div class="step-item">
+              <span>03</span>
+              <h3>summarize_taste</h3>
+              <p>Synthesize recurring preferences, anti-patterns, and branch directions.</p>
+            </div>
+            <div class="step-item">
+              <span>04</span>
+              <h3>visualize_taste</h3>
+              <p>Render boards from the summary and library design synthesis.</p>
+            </div>
+          </div>
+
+          <div class="artifact-grid" id="examples">
+            <article class="artifact-card captured-card">
+              <div class="artifact-label">Captured reference</div>
+              <div class="artifact-subtitle">Saved asset + `library.jsonl` row</div>
+              <div class="artifact-frame reference-frame">
+                <img
+                  src="./assets/references/antimetal-homepage.webp"
+                  alt="Captured Antimetal homepage reference"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+              <div class="artifact-footer">
+                <span>`assets/` + `library.jsonl`</span>
+                <span>↗</span>
+              </div>
+            </article>
+
+            <article class="artifact-card design-card">
+              <div class="artifact-label">Extracted design system</div>
+              <div class="artifact-subtitle">`design-system.json` + `design.md`</div>
+              <div class="design-panel">
+                <div class="type-preview">
+                  <div class="type-sample display">Aa</div>
+                  <div class="type-copy">
+                    <strong>Instrument Serif</strong>
+                    <span>Display / Statement / Voice</span>
+                  </div>
+                </div>
+                <div class="type-preview body-preview">
+                  <div class="type-sample sans">Aa</div>
+                  <div class="type-copy">
+                    <strong>Manrope</strong>
+                    <span>Interface / Body / Utility</span>
+                  </div>
+                </div>
+                <div class="swatch-block">
+                  <div class="swatch swatch-navy"></div>
+                  <div class="swatch swatch-blue"></div>
+                  <div class="swatch swatch-fog"></div>
+                  <div class="swatch swatch-lime"></div>
+                  <div class="swatch swatch-paper"></div>
+                </div>
+                <div class="mini-illustration">
+                  <img
+                    src="./assets/generated/system-illustration-v1.webp"
+                    alt="Abstract system illustration preview"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+              </div>
+              <div class="artifact-footer">
+                <span>`design-docs/references/...`</span>
+                <span>↗</span>
+              </div>
+            </article>
+
+            <article class="artifact-card summary-card">
+              <div class="artifact-label">Taste summary</div>
+              <div class="artifact-subtitle">`taste-summary.json` + branch directions</div>
+              <div class="summary-columns">
+                <div>
+                  <h4>Stable preferences</h4>
+                  <ul>
+                    <li>Deep blue atmospheres</li>
+                    <li>High contrast hierarchy</li>
+                    <li>Technical clarity</li>
+                    <li>Controlled accent usage</li>
+                    <li>Abstract system imagery</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4>Anti-patterns</h4>
+                  <ul class="warning-list">
+                    <li>Cluttered layouts</li>
+                    <li>Overused gradients</li>
+                    <li>Generic illustrations</li>
+                    <li>Low contrast text</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4>Tensions</h4>
+                  <ul class="tension-list">
+                    <li>Technical rigor vs. human warmth</li>
+                    <li>Data-first vs. visual storytelling</li>
+                    <li>Precision vs. playfulness</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="artifact-footer">
+                <span>`taste-summary.json`</span>
+                <span>↗</span>
+              </div>
+            </article>
+
+            <article class="artifact-card directions-card">
+              <div class="artifact-label">Generated directions</div>
+              <div class="artifact-subtitle">`taste-boards/` + branch-ready outputs</div>
+              <div class="direction-stack">
+                <div class="direction-board board-infra">
+                  <div class="board-title">infra-editorial</div>
+                  <div class="board-atlas">
+                    <div class="mini-bars"></div>
+                    <div class="mini-card"></div>
+                    <div class="mini-circle"></div>
+                  </div>
+                </div>
+                <div class="direction-board board-warm">
+                  <div class="board-title">warm-technical</div>
+                  <div class="board-image">
+                    <img
+                      src="./assets/references/browserbase-homepage.webp"
+                      alt="Warm technical direction sample"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </div>
+                </div>
+                <div class="direction-board board-strange">
+                  <div class="board-title">strange-systems</div>
+                  <div class="board-atlas strange-atlas">
+                    <div class="mini-type">Aa</div>
+                    <div class="mini-graph"></div>
+                    <div class="mini-orbit"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="artifact-footer">
+                <span>`taste-boards/`</span>
+                <span>↗</span>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="details-section" id="install">
+          <div class="details-copy">
+            <div class="section-kicker section-kicker-soft">Open source repo</div>
+            <h2>Install it in Codex. Publish the front door.</h2>
+            <p>
+              The repo ships three useful layers together: a public GitHub
+              install path for Codex, the actual plugin package in
+              `plugins/moodboard-capture`, and this static landing page in
+              `site/` so the repo is shareable before anyone even opens the
+              README.
+            </p>
+            <ul class="benefit-list">
+              <li>The public install command points directly at this GitHub repo as a Codex marketplace source.</li>
+              <li>`plugins/moodboard-capture/` contains the plugin package and MCP server.</li>
+              <li>`site/` is static HTML + CSS, ready for GitHub Pages or any static host.</li>
+              <li>`scripts/refresh-plugin.sh` keeps local development installs in sync after edits.</li>
+            </ul>
+            <div class="details-actions">
+              <a
+                class="button button-primary"
+                href="https://github.com/ussumant/moodboard-capture/tree/main/plugins/moodboard-capture"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open plugin package
+                <span aria-hidden="true">↗</span>
+              </a>
+              <a
+                class="button button-outline"
+                href="https://github.com/ussumant/moodboard-capture/blob/main/plugins/moodboard-capture/README.md"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Read the plugin README
+              </a>
+            </div>
+          </div>
+
+          <div class="details-panel">
+            <div class="panel-header">
+              <span>Install + first run</span>
+              <a
+                class="panel-link"
+                href="https://github.com/ussumant/moodboard-capture/tree/main/plugins/moodboard-capture"
+                target="_blank"
+                rel="noreferrer"
+              >
+                plugin package ↗
+              </a>
+            </div>
+            <div class="panel-body panel-body-code">
+              <div class="code-stack">
+                <section class="code-card install-command-card">
+                  <div class="code-label">Public install</div>
+                  <pre><code>codex plugin marketplace add ussumant/moodboard-capture</code></pre>
+                  <p class="code-card-copy">
+                    Add this GitHub repo as a Codex marketplace source, then
+                    enable <strong>Moodboard Capture</strong> in the Codex UI.
+                  </p>
+                  <div class="install-actions">
+                    <button
+                      class="button button-primary button-compact"
+                      type="button"
+                      data-copy="codex plugin marketplace add ussumant/moodboard-capture"
+                      data-copy-text="Copy install command"
+                      data-copied-text="Install command copied"
+                    >
+                      <span class="button-copy-text">Copy install command</span>
+                    </button>
+                    <a
+                      class="button button-secondary button-compact"
+                      href="https://github.com/ussumant/moodboard-capture/tree/main/plugins/moodboard-capture"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open plugin package
+                    </a>
+                  </div>
+                </section>
+
+                <div class="install-mini-grid">
+                  <section class="code-card install-note-card">
+                    <div class="code-label">Then in Codex</div>
+                    <div class="install-step-list">
+                      <div class="install-step">
+                        <span class="install-step-number">01</span>
+                        <p>Paste the copied command into your terminal.</p>
+                      </div>
+                      <div class="install-step">
+                        <span class="install-step-number">02</span>
+                        <p>Open Codex and enable <strong>Moodboard Capture</strong> from the added marketplace source.</p>
+                      </div>
+                      <div class="install-step">
+                        <span class="install-step-number">03</span>
+                        <p>Start with natural-language capture instead of memorizing CLI commands.</p>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section class="code-card">
+                    <div class="code-label">Try this first</div>
+                    <pre><code>Save https://antimetal.com/ to my moodboard
+and explain what makes the design work.</code></pre>
+                  </section>
+                </div>
+
+                <section class="code-card">
+                  <div class="code-label">Local development</div>
+                  <pre><code>git clone https://github.com/ussumant/moodboard-capture.git
+cd moodboard-capture/plugins/moodboard-capture
+npm install
+cd ../..
+codex plugin marketplace add .</code></pre>
+                </section>
+              </div>
+
+              <div class="output-list">
+                <div class="output-row">
+                  <span class="output-key">Default inbox</span>
+                  <code>~/Documents/Moodboards/Inbox</code>
+                </div>
+                <div class="output-row">
+                  <span class="output-key">Reference docs</span>
+                  <code>design-docs/references/&lt;recordId&gt;/design.md</code>
+                </div>
+                <div class="output-row">
+                  <span class="output-key">Library summary</span>
+                  <code>taste-summary.json</code>
+                </div>
+                <div class="output-row">
+                  <span class="output-key">Generated boards</span>
+                  <code>taste-boards/</code>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="proof-section" id="outputs">
+          <div class="proof-intro">
+            <h2>The core artifacts the plugin writes.</h2>
+          </div>
+          <div class="proof-grid output-grid">
+            <article class="output-card">
+              <div class="output-path">library.jsonl</div>
+              <h3>Structured capture log</h3>
+              <p>One newline-delimited record per saved URL or image, including source metadata, taste analysis, and extraction status.</p>
+            </article>
+            <article class="output-card">
+              <div class="output-path">design-docs/references/&lt;recordId&gt;/design.md</div>
+              <h3>Per-reference design read</h3>
+              <p>A reusable Markdown doc that explains typography, color, layout, imagery, and interesting regions for one reference.</p>
+            </article>
+            <article class="output-card">
+              <div class="output-path">taste-summary.json</div>
+              <h3>Library-level taste brief</h3>
+              <p>A synthesis of stable preferences, anti-patterns, tensions, and branch directions across the active moodboard library.</p>
+            </article>
+            <article class="output-card">
+              <div class="output-path">taste-boards/</div>
+              <h3>Generated visual directions</h3>
+              <p>Branch-specific boards like `infra-editorial`, `warm-technical`, and `strange-systems` grounded in captured references.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="cta-section" id="cta">
+          <h2>Open source the workflow, not just the screenshots.</h2>
+          <p>Use the plugin in Codex, publish the `site/` folder, and keep evolving the repo in public.</p>
+          <div class="hero-actions hero-actions-center">
+            <a
+              class="button button-primary"
+              href="#install"
+              data-copy="codex plugin marketplace add ussumant/moodboard-capture"
+              data-copy-text="Install plugin"
+              data-copied-text="Install command copied"
+            >
+              <span class="button-copy-text">Install plugin</span>
+            </a>
+            <a
+              class="button button-secondary"
+              href="https://github.com/ussumant/moodboard-capture"
+              target="_blank"
+              rel="noreferrer"
+            >
+              View the repo
+              <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer" id="docs">
+        <div class="footer-brand">
+          <a class="brand footer-brand-link" href="#top">
+            <span class="brand-mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" role="img">
+                <circle cx="12" cy="5" r="1.4"></circle>
+                <circle cx="7.2" cy="9.2" r="1.4"></circle>
+                <circle cx="16.8" cy="9.2" r="1.4"></circle>
+                <circle cx="5.4" cy="15.5" r="1.4"></circle>
+                <circle cx="12" cy="15.5" r="1.4"></circle>
+                <circle cx="18.6" cy="15.5" r="1.4"></circle>
+                <path d="M7.8 9.4 11.1 6.2M12.9 6.2l3.3 3.2M6.8 14l-.7-3M17.9 11l-.7 3M7.8 15.5H10.6M13.4 15.5h2.8"></path>
+              </svg>
+            </span>
+            <span>Moodboard Capture</span>
+          </a>
+          <p>Open-source Codex plugin for capture, design-system extraction, taste memory, and reusable direction generation.</p>
+          <div class="social-row">
+            <a href="https://github.com/ussumant/moodboard-capture" target="_blank" rel="noreferrer" aria-label="GitHub">GitHub</a>
+            <a href="https://github.com/ussumant/moodboard-capture/blob/main/README.md" target="_blank" rel="noreferrer" aria-label="README">README</a>
+            <a href="https://github.com/ussumant/moodboard-capture/tree/main/site" target="_blank" rel="noreferrer" aria-label="Site source">Site source</a>
+          </div>
+        </div>
+
+        <div class="footer-columns">
+          <div>
+            <h3>Repo</h3>
+            <a href="#product">Overview</a>
+            <a href="#install">Install</a>
+            <a href="#outputs">Outputs</a>
+            <a href="https://github.com/ussumant/moodboard-capture" target="_blank" rel="noreferrer">GitHub</a>
+          </div>
+          <div>
+            <h3>Commands</h3>
+            <a href="#how-it-works">capture_taste</a>
+            <a href="#how-it-works">extract_design_system</a>
+            <a href="#how-it-works">summarize_taste</a>
+            <a href="#how-it-works">visualize_taste</a>
+          </div>
+          <div>
+            <h3>Resources</h3>
+            <a href="https://github.com/ussumant/moodboard-capture/blob/main/plugins/moodboard-capture/README.md" target="_blank" rel="noreferrer">Plugin README</a>
+            <a href="https://github.com/ussumant/moodboard-capture/blob/main/docs/taste-workbench-use-cases.md" target="_blank" rel="noreferrer">Use cases</a>
+            <a href="https://github.com/ussumant/moodboard-capture/tree/main/site" target="_blank" rel="noreferrer">Site source</a>
+            <a href="https://github.com/ussumant/moodboard-capture/tree/main/plugins/moodboard-capture" target="_blank" rel="noreferrer">Plugin package</a>
+          </div>
+        </div>
+
+        <div class="footer-note">
+          <span>Public install flow, local-first artifacts, and a publishable front door in one repo.</span>
+          <span>© 2026 Moodboard Capture</span>
+        </div>
+      </footer>
+    </div>
+    <div class="sr-only" id="clipboard-status" aria-live="polite"></div>
+    <script src="./app.js" defer></script>
+  </body>
+</html>

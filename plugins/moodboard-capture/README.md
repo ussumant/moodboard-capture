@@ -83,7 +83,15 @@ node ./scripts/cli.js extract-design-system \
 
 ## Installation
 
-First-time setup from this repo:
+Install directly from the public GitHub repo:
+
+```bash
+codex plugin marketplace add ussumant/moodboard-capture
+```
+
+Then enable/install `Moodboard Capture` in the Codex UI if Codex does not enable it automatically.
+
+If you are developing from a local checkout instead:
 
 ```bash
 cd plugins/moodboard-capture
@@ -91,8 +99,6 @@ npm install
 cd ../..
 codex plugin marketplace add .
 ```
-
-Then enable/install `Moodboard Capture` in the Codex UI if Codex does not enable it automatically.
 
 ## Upgrade
 

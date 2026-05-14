@@ -31,34 +31,54 @@
 
 - `.agents/plugins/marketplace.json` - marketplace manifest for Codex
 - `plugins/moodboard-capture` - actual plugin package
+- `docs/taste-workbench-use-cases.md` - product use cases, example forms, and generation workflows
+- `site/` - static landing page for the open-source repo, deployable with the included GitHub Pages workflow
 
-## Installation
+## Landing page
 
-First-time setup:
+To preview the landing page locally:
 
 ```bash
-cd /Users/sumant/dev/personalos/Coding/moodboard-capture/plugins/moodboard-capture
-npm install
+cd site
+python3 -m http.server 4173
+```
 
-cd /Users/sumant/dev/personalos/Coding/moodboard-capture
-codex plugin marketplace add .
+Then open [http://127.0.0.1:4173](http://127.0.0.1:4173).
+
+## Install from GitHub
+
+For most users, the shortest install path is the public repository source:
+
+```bash
+codex plugin marketplace add ussumant/moodboard-capture
 ```
 
 Then enable/install `Moodboard Capture` in Codex if it is not already enabled.
 
-## Upgrade
+## Develop locally
 
-After pulling new changes to this repo, refresh the local plugin registration:
+If you want to edit the plugin from a local checkout:
 
 ```bash
-cd /Users/sumant/dev/personalos/Coding/moodboard-capture
+git clone https://github.com/ussumant/moodboard-capture.git
+cd moodboard-capture/plugins/moodboard-capture
+npm install
+
+cd ../..
+codex plugin marketplace add .
+```
+
+## Upgrade
+
+After pulling new changes to a local checkout, refresh the local plugin registration:
+
+```bash
 ./scripts/refresh-plugin.sh
 ```
 
 If the plugin dependencies changed too:
 
 ```bash
-cd /Users/sumant/dev/personalos/Coding/moodboard-capture
 ./scripts/refresh-plugin.sh --install-deps
 ```
 
