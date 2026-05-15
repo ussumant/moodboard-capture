@@ -1,7 +1,7 @@
 {
   "name": "moodboard-capture",
   "version": "0.5.0",
-  "description": "Capture inspiration assets, build reusable taste-memory profiles, derive design directions, and plan landing pages from a repo moodboard folder or personal inbox.",
+  "description": "Capture inspiration assets, build reusable taste-memory profiles, open local ingredient boards, derive design directions, and plan landing pages from a repo moodboard folder or personal inbox.",
   "author": {
     "name": "Moodboard Capture Contributors",
     "email": "hello@example.com",
@@ -23,8 +23,8 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Moodboard Capture",
-    "shortDescription": "Save inspiration, build taste-memory profiles, derive design directions, and plan landing pages from real references.",
-    "longDescription": "Captures a desktop full-page screenshot for a URL or imports a local image, saves it into a moodboard library, builds per-item taste interpretation, generates per-reference design docs, synthesizes reusable directions, and writes landing-page briefs plus provenance artifacts when analysis is available.",
+    "shortDescription": "Save inspiration, open a local ingredient board, derive design directions, and plan landing pages from real references.",
+    "longDescription": "Captures a desktop full-page screenshot for a URL or imports a local image, saves it into a moodboard library, builds per-item taste interpretation, generates per-reference design docs, opens a fast local ingredient board, synthesizes reusable directions, and writes landing-page briefs plus provenance artifacts when analysis is available.",
     "developerName": "Local plugin",
     "category": "Productivity",
     "capabilities": [
@@ -37,6 +37,7 @@
     "defaultPrompt": [
       "Save https://example.com to my moodboard and explain what makes the design work.",
       "Generate a design.md for that saved reference and focus on typography plus components.",
+      "Open my moodboard as an ingredient board.",
       "Derive design directions from my moodboard and plan a landing page in the warm-technical direction."
     ],
     "brandColor": "#111827"

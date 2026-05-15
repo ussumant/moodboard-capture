@@ -21,6 +21,7 @@ import {
   deriveDesignDirections,
   planLandingPage,
 } from './landing-page-workflow.js';
+import { openMoodboardBoard } from './board-view.js';
 
 const server = new Server(
   {
@@ -221,6 +222,28 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: 'open_moodboard_board',
+        description: 'Open the active library as a fast local ingredient-board viewer backed by board manifest artifacts.',
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            destinationPath: {
+              type: 'string',
+              description: 'Optional absolute or workspace-relative library root override.',
+            },
+            resetLayout: {
+              type: 'boolean',
+              description: 'When true, rebuild the board layout for all items while keeping the underlying library artifacts intact.',
+            },
+            regenerateBackground: {
+              type: 'boolean',
+              description: 'When true, refresh the board background asset before opening the viewer.',
+            },
+          },
+        },
+      },
+      {
         name: 'save_inspiration_to_moodboard',
         description: 'Compatibility alias for capture_taste.',
         inputSchema: {
@@ -337,6 +360,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         referenceIds: args.referenceIds,
         targetAudience: args.targetAudience,
         productGoal: args.productGoal,
+      });
+    } else if (name === 'open_moodboard_board') {
+      result = await openMoodboardBoard({
+        destinationPath: args.destinationPath,
+        resetLayout: args.resetLayout,
+        regenerateBackground: args.regenerateBackground,
       });
     } else if (name === 'save_inspiration_to_moodboard') {
       result = await saveInspirationToMoodboard({

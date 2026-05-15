@@ -11,10 +11,15 @@
     "derive-design-directions": "node ./scripts/cli.js derive-design-directions",
     "plan-landing-page": "node ./scripts/cli.js plan-landing-page",
     "visualize-taste": "node ./scripts/cli.js visualize-taste",
+    "open-moodboard-board": "node ./scripts/cli.js open-moodboard-board",
     "test:smoke": "node ./scripts/cli.js capture --url https://example.com"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
-    "playwright": "^1.54.2"
+    "@vitejs/plugin-react": "^6.0.1",
+    "playwright": "^1.54.2",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "vite": "^8.0.13"
   }
 }

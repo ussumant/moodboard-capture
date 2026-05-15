@@ -8,6 +8,7 @@ import {
   deriveDesignDirections,
   planLandingPage,
 } from './landing-page-workflow.js';
+import { openMoodboardBoard } from './board-view.js';
 import { summarizeTaste } from './taste-summary.js';
 import { visualizeTaste } from './taste-visuals.js';
 
@@ -48,6 +49,11 @@ async function runCommand(command, argv) {
     return planLandingPage(parsed);
   }
 
+  if (command === 'open-moodboard-board') {
+    const parsed = parseBoardArgs(argv);
+    return openMoodboardBoard(parsed);
+  }
+
   const parsed = parseCaptureArgs(argv);
   return saveInspirationToMoodboard(parsed);
 }
@@ -62,7 +68,7 @@ function splitCommand(argv) {
   }
 
   const normalized = first.trim().toLowerCase();
-  if (['capture', 'extract-design-system', 'summarize-taste', 'visualize-taste', 'derive-design-directions', 'plan-landing-page'].includes(normalized)) {
+  if (['capture', 'extract-design-system', 'summarize-taste', 'visualize-taste', 'derive-design-directions', 'plan-landing-page', 'open-moodboard-board'].includes(normalized)) {
     return {
       command: normalized,
       argv: rest,
@@ -317,6 +323,34 @@ function parseLandingPageArgs(argv) {
     throw new Error(
       'Usage: node ./scripts/cli.js plan-landing-page --directionId <infra-editorial|warm-technical|strange-systems> [--destinationPath <path>] [--referenceId <id>] [--targetAudience <text>] [--productGoal <text>]'
     );
+  }
+
+  return parsed;
+}
+
+function parseBoardArgs(argv) {
+  const parsed = {
+    resetLayout: false,
+    regenerateBackground: false,
+  };
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+
+    if (token === '--destinationPath' || token === '--destination-path') {
+      parsed.destinationPath = argv[index + 1];
+      index += 1;
+      continue;
+    }
+
+    if (token === '--resetLayout' || token === '--reset-layout') {
+      parsed.resetLayout = true;
+      continue;
+    }
+
+    if (token === '--regenerateBackground' || token === '--regenerate-background') {
+      parsed.regenerateBackground = true;
+    }
   }
 
   return parsed;

@@ -10,6 +10,7 @@ Save inspiration assets into a moodboard library from Codex, build reusable tast
 - `derive_design_directions`: turn the active library into 2-3 evidence-backed direction variants for downstream design work
 - `plan_landing_page`: turn a chosen direction into a build-ready landing-page brief plus provenance artifacts
 - `visualize_taste`: generate visual boards from the summary artifact and, when present, direction-level design artifacts
+- `open_moodboard_board`: open the active library as a fast local ingredient board with grouped captures and a detail sidebar
 - `landing-page-from-taste` skill: orchestrate summary -> directions -> optional visuals -> landing-page brief -> review checkpoint
 - Compatibility aliases remain available:
   - `save_inspiration_to_moodboard`
@@ -47,6 +48,7 @@ Save inspiration assets into a moodboard library from Codex, build reusable tast
 - `visualize_taste`
 - `derive_design_directions`
 - `plan_landing_page`
+- `open_moodboard_board`
 - `save_inspiration_to_moodboard` compatibility alias
 - `save_website_to_moodboard` compatibility alias
 - `generate_taste_visuals` compatibility alias
@@ -82,6 +84,12 @@ Save inspiration assets into a moodboard library from Codex, build reusable tast
 - `targetAudience` (optional string)
 - `productGoal` (optional string)
 
+## `open_moodboard_board` arguments
+
+- `destinationPath` (optional)
+- `resetLayout` (optional boolean)
+- `regenerateBackground` (optional boolean)
+
 ## CLI examples
 
 ```bash
@@ -109,6 +117,9 @@ node ./scripts/cli.js plan-landing-page \
   --directionId warm-technical \
   --targetAudience "Founders and designers evaluating an open-source Codex plugin" \
   --productGoal "Explain the workflow clearly and prove it can generate implementation-ready landing page direction."
+
+node ./scripts/cli.js open-moodboard-board \
+  --destinationPath /Users/me/Documents/Moodboards/Inbox
 ```
 
 ## Installation
@@ -197,6 +208,26 @@ If Codex still shows the old version, reload Codex or disable/re-enable the plug
 - Generated boards are saved under `taste-boards/landing-page/` when direction artifacts exist, otherwise `taste-boards/`
 - This command requires `OPENAI_API_KEY`
 
+## Visual board viewer
+
+- `open_moodboard_board` creates or updates a library-scoped board layer under `board-view/`
+- The viewer opens the active library as a simple read-only moodboard with:
+  - a deterministic mesh-grid board surface
+  - grouped captures arranged by ingredient buckets
+  - tiny color-coded chips instead of sticky-note overlays
+  - a right sidebar for deeper context when a capture is clicked
+- Default ingredient groups are:
+  - `color-mood`
+  - `typography`
+  - `materiality`
+  - `proof-ui`
+- Board artifacts live in:
+  - `board-view/background.svg`
+  - `board-view/board-manifest.json`
+  - `board-view/board-state.json`
+- `resetLayout` rebuilds the board manifest from the current library without touching the source captures
+- `regenerateBackground` refreshes the deterministic mesh board surface without changing the capture source artifacts
+
 ## Profile artifacts
 
 - `library.jsonl`: capture records with source metadata, taste-analysis fields, and design extraction fields
@@ -217,4 +248,7 @@ If Codex still shows the old version, reload Codex or disable/re-enable the plug
 - `landing-page-docs/provenance.json`: internal trace from brief decisions back to references and extracted signals
 - `landing-page-docs/explain.json`: machine-readable page composition to ingredient mapping
 - `landing-page-docs/explain.md`: readable page-level explain mode
+- `board-view/board-manifest.json`: plugin-owned mapping from captures to grouped board cards, chips, and sidebar detail sections
+- `board-view/board-state.json`: lightweight compatibility artifact for the local board command flow
+- `board-view/background.svg`: deterministic mesh-board surface for the active library
 - `workspace-taste-profile.json`: rolled-up profile stored beside the active library in the current destination

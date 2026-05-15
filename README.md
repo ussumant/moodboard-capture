@@ -10,6 +10,7 @@
 - `derive_design_directions`
 - `plan_landing_page`
 - `visualize_taste`
+- `open_moodboard_board`
 - `landing-page-from-taste` skill for orchestrating landing-page planning from a moodboard library
 - Compatibility aliases remain available for the older save-oriented surface
 
@@ -33,6 +34,10 @@
   - `design-docs/directions/<directionId>/design.md`
   - `design-docs/directions/<directionId>/explain.json`
   - `design-docs/directions/<directionId>/explain.md`
+- Local ingredient board viewing with:
+  - `board-view/background.svg`
+  - `board-view/board-manifest.json`
+  - `board-view/board-state.json`
 - Landing-page planning with:
   - `landing-page-docs/landing-page-brief.json`
   - `landing-page-docs/landing-page-brief.md`
@@ -153,6 +158,9 @@ node ./scripts/cli.js plan-landing-page \
   --directionId infra-editorial \
   --targetAudience "Builders evaluating whether this Codex plugin can generate trustworthy design direction" \
   --productGoal "Create an install-forward open-source landing page with real proof."
+
+node ./scripts/cli.js open-moodboard-board \
+  --destinationPath /Users/me/Documents/Moodboards/Inbox
 ```
 
 ## Analysis behavior
@@ -187,11 +195,19 @@ node ./scripts/cli.js plan-landing-page \
 - `derive_design_directions` turns the current library into 2-3 richer direction artifacts grounded in extracted references
 - `plan_landing_page` turns one chosen direction into a section-by-section brief plus provenance
 - `visualize_taste` uses the taste summary, prefers direction-level design artifacts when present, and consumes recipe-level ingredients such as materiality, realism, CTA tone, and artifact-display strategy
+- `open_moodboard_board` opens the active library as a local ingredient board with grouped captures, tiny chips, and a detail sidebar
 - By default it renders three branches:
   - `infra-editorial`
   - `warm-technical`
   - `strange-systems`
 - Generated images are saved in `~/Documents/Moodboards/Inbox/taste-boards/landing-page` when direction artifacts exist, otherwise `taste-boards`
+
+## Visual board viewer
+
+- `open_moodboard_board` creates a board layer inside the active library, then opens a local read-only viewer
+- The viewer uses a deterministic mesh-board background and groups captures into ingredient buckets like `color-mood`, `typography`, `materiality`, and `proof-ui`
+- Cards stay visually quiet with small color-coded chips, and clicking a card opens a detail sidebar with the extracted context
+- This is a plugin-local workflow surface, not the public landing page
 
 ## Default save behavior
 
